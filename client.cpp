@@ -2,6 +2,10 @@
 #include <thread>
 #include <iostream>
 
+#include "client.h"
+
+using namespace std;
+
 int main()
 {
   std::cerr << "web client is not implemented yet" << std::endl;
