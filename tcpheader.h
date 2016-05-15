@@ -3,7 +3,7 @@
 
 #include <vector>
 
-typedef vector<uint16_t> Segment;
+typedef std::vector<uint16_t> Segment;
 
 struct TcpHeader {
 public:
