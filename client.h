@@ -9,19 +9,19 @@ public:
 	uint16_t insert(uint16_t seqNo, Segment seg);
 private:
 	uint16_t m_seqNo;
-	Segment m_seg;
+	std::vector<Segment> m_buffer;
 };
 
 void ReceivingBuffer::setInitSeq(uint16_t seqNo) {
 	m_seqNo = seqNo;
+	m_buffer.reserve(64);
 }
 
 uint16_t ReceivingBuffer::insert(uint16_t seqNo, Segment seg) {
-	m_seg = seg;
-	return seqNo + (seg.size() * 2);
+	if(seqNo - m_seqNo >= m_buffer.capacity()) {
+		return 0;
+	}
+	m_buffer[seqNo - m_seqNo] = seg;
 }
-
-
-
 
 #endif
