@@ -14,6 +14,8 @@ public:
 	Segment getSeg(uint16_t);
 private:
 	uint16_t m_seqNo;
+	TcpHeader m_header;
+	Segment m_seg;
 };
 
 class FileReader {
@@ -25,6 +27,7 @@ public:
 
 void OutputBuffer::setInitSeq(uint16_t seqNo) {
 	m_header.seqNo = seqNo;
+	m_seg.reserve(1024);
 }
 
 void OutputBuffer::ack(uint16_t ackNo) {
@@ -32,6 +35,24 @@ void OutputBuffer::ack(uint16_t ackNo) {
 }
 
 void OutputBuffer::timeout() {
-
+	//???
 }
+
+bool OutputBuffer::hasSpace(uint16_t size = 1024) {
+	return (m_seg.capacity() - m_packet.getSegment().size() >= size);
+}
+
+void OutputBuffer::insert(Segment seg) {
+	m_seg.insert(m_seg.end(), seg.begin(), seg.end());
+}
+
+uint16_t OutputBuffer::nextSegSeq() {
+	return (m_seqNo + m_seg.size() * 2);
+}
+
+Segment OutputBuffer::getSeg(uint16_t) {
+	return m_seg;
+}
+
+
 #endif
