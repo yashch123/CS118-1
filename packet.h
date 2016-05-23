@@ -2,6 +2,7 @@
 #define PACKET_H
 
 #include <vector>
+#include <cstdint> 
 
 #define FIN 0x1
 #define SYN 0x2
@@ -84,27 +85,27 @@ void Packet::setRcvWin(uint16_t rcvWin) {
 	m_header.rcvWin = rcvWin;
 }
 
-void Packet::setFlags(uint16_t flags) {
+void Packet::setFlags(uint8_t flags) {
 	m_header.flags = flags;
 }
 
 void Packet::setSYN() { 
-	m_header.flags | SYN; 
+	m_header.flags |= SYN; 
 }
 
 void Packet::setACK() { 
-	m_header.flags | ACK; 
+	m_header.flags |= ACK; 
 }
 
 void Packet::setFIN() { 
-	m_header.flags | FIN; 
+	m_header.flags |= FIN; 
 }
 
 TcpHeader Packet::getHeader() {
 	return m_header;
 }
 
-TcpHeader Packet::getSegment() {
+Segment Packet::getSegment() {
 	return m_seg;
 }
 

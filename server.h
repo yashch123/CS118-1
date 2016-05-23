@@ -36,10 +36,14 @@ void OutputBuffer::ack(uint16_t ackNo) {
 
 void OutputBuffer::timeout() {
 	//???
+	// fast retransmit?
+	// or poll for timeout? 
 }
 
-bool OutputBuffer::hasSpace(uint16_t size = 1024) {
-	return (m_seg.capacity() - m_packet.getSegment().size() >= size);
+bool OutputBuffer::hasSpace(uint16_t size) {
+	// What is m_packet???
+	// return (m_seg.capacity() - m_packet.getSegment().size() >= size);
+	return true; 
 }
 
 void OutputBuffer::insert(Segment seg) {

@@ -1,13 +1,16 @@
 #include <string>
 #include <thread>
+#include <stdio.h> 
 #include <iostream>
 #include <string.h> 	// memset, memcpy 
 #include <sys/socket.h> // socket API 
 #include <netinet/in.h> // sockaddr_in
-#include <netdb.h> 
-#include <stdlib.h> 
+#include <unistd.h> 	// close()
+#include <netdb.h> 		// gethostbyname
+#include <stdlib.h> 	// atoi 
 #include "client.h"
 
+#define BUFLEN 8192
 using namespace std;
 
 /*******************
@@ -28,8 +31,8 @@ void error(char *msg){
 int main(int argc, char **argv)
 {
 	// TODO: Parse command line arguments 
-	if (arg != 3) {
-		cerr < "Usage: " << argv[0] << " <SERVER-HOST-OR-IP>" << " PORT-NUMBER" << endl; 
+	if (argc != 3) {
+		cerr << "Usage: " << argv[0] << " <SERVER-HOST-OR-IP>" << " PORT-NUMBER" << endl; 
 		exit(1); 
 	}
 
@@ -38,7 +41,7 @@ int main(int argc, char **argv)
 	struct sockaddr_in servaddr;
 	memset((char *)&servaddr, 0, sizeof(servaddr)); 
 	servaddr.sin_family = AF_INET; 
-	servaddr.sin_port = htons(argv[2]); 
+	servaddr.sin_port = htons(atoi(argv[2])); 
 
 	// Get host IP address 
 	struct hostent *hp; 
@@ -67,6 +70,34 @@ int main(int argc, char **argv)
 		perror("bind failed"); 
 		exit(1); 
 	}
+
+	char buf[BUFLEN]; 
+	char message[BUFLEN]; 
+	unsigned int slen = sizeof(servaddr); 
+	while(1){
+		cout << "Enter message : "; 
+	    gets(message);
+         
+        //send the message
+        if (sendto(sockfd, message, strlen(message) , 0 , (struct sockaddr *) &servaddr, slen) == -1)
+        {
+            perror("sendto()"); 
+        }
+         
+        //receive a reply and print it
+        //clear the buffer by filling null, it might have previously received data
+        memset(buf,'\0', BUFLEN);
+        //try to receive some data, this is a blocking call
+        if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
+        {
+        	perror("recvfrom()"); 
+        }
+         
+        puts(buf);
+    }
+ 
+    close(sockfd);
+    return 0;
 
 	// Try decoding server name as an IP address 
 
