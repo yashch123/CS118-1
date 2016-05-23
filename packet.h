@@ -3,6 +3,10 @@
 
 #include <vector>
 
+#define SYN 0x1
+#define ACK 0x2
+#define FIN 0x4 
+
 typedef std::vector<uint16_t> Segment;
 
 struct TcpHeader {
@@ -11,9 +15,17 @@ public:
  	uint16_t ackNo;
  	uint16_t rcvWin;
  	uint8_t reserved;
- 	uint8_t flags;
+ 	uint8_t flags = 0;
  };
 
+/*******************************
+Flag format of TCP Header
+0 1 2 3 4 5 6 7 
+ | | | | |F|A|S
+ 		  I|C|Y
+ 		  N|K|N
+********************************/ 
+ 		  
 class Packet {
 public:
 	Packet();
@@ -25,6 +37,9 @@ public:
 	void setAckNo(uint16_t ackNo);
 	void setRcvWin(uint16_t rcvWin);
 	void setFlags(uint8_t flags);
+	void setSYN(); 
+	void setACK(); 
+	void setFIN(); 
 	TcpHeader getHeader();
 	Segment getSegment();
 private:
@@ -73,6 +88,18 @@ void Packet::setFlags(uint16_t flags) {
 	m_header.flags = flags;
 }
 
+void Packet::setSYN() { 
+	m_header.flags | SYN; 
+}
+
+void Packet::setACK() { 
+	m_header.flags | ACK; 
+}
+
+void Packet::setFIN() { 
+	m_header.flags | FIN; 
+}
+
 TcpHeader Packet::getHeader() {
 	return m_header;
 }
@@ -82,4 +109,4 @@ TcpHeader Packet::getSegment() {
 }
 
 
- #endif
+ #endif // PACKET_H
