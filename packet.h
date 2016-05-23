@@ -3,9 +3,9 @@
 
 #include <vector>
 
-#define SYN 0x1
-#define ACK 0x2
-#define FIN 0x4 
+#define FIN 0x1
+#define SYN 0x2
+#define ACK 0x4 
 
 typedef std::vector<uint16_t> Segment;
 
@@ -20,10 +20,10 @@ public:
 
 /*******************************
 Flag format of TCP Header
-0 1 2 3 4 5 6 7 
- | | | | |F|A|S
- 		  I|C|Y
- 		  N|K|N
+7 6 5 4 3 2 1 0 
+ | | | | |A|S|F
+ 		  C|Y|I
+ 		  K|N|N
 ********************************/ 
  		  
 class Packet {
