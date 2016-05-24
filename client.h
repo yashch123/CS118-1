@@ -14,7 +14,7 @@ private:
 
 void ReceivingBuffer::setInitSeq(uint16_t seqNo) {
 	m_seqNo = seqNo;
-	m_buffer.reserve(1024);
+	m_buffer.reserve(8192);
 }
 
 //if insertion fails, return nonzero

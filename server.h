@@ -41,9 +41,7 @@ void OutputBuffer::timeout() {
 }
 
 bool OutputBuffer::hasSpace(uint16_t size) {
-	// What is m_packet???
-	// return (m_seg.capacity() - m_packet.getSegment().size() >= size);
-	return true; 
+	return (m_seg.capacity() - m_seg.size() >= size);
 }
 
 void OutputBuffer::insert(Segment seg) {

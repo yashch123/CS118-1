@@ -1,13 +1,16 @@
 #include <string>
 #include <thread>
-#include <stdio.h> 
 #include <iostream>
+
+#include <stdio.h> 
 #include <string.h> 	// memset, memcpy 
 #include <sys/socket.h> // socket API 
 #include <netinet/in.h> // sockaddr_in
 #include <unistd.h> 	// close()
 #include <netdb.h> 		// gethostbyname
-#include <stdlib.h> 	// atoi 
+#include <stdlib.h> 	// atoi, rand
+#include <ctype.h>		// isalpha
+
 #include "client.h"
 
 #define PORTNUM 0
@@ -37,7 +40,7 @@ int main(int argc, char **argv)
 		exit(1); 
 	}
 
-	// Decode hostname, assuming it is not already an IP address 
+	// Decode hostname
 	// argv[1] = hostname/IP, argv[2] = port #
 	struct sockaddr_in servaddr;
 	memset((char *)&servaddr, 0, sizeof(servaddr)); 
@@ -75,9 +78,31 @@ int main(int argc, char **argv)
 	// TODO: Set up TCP connection 
 	// 1) SYN w/ random sequence no. 
 	// 2) wait for SYN ACK (w/ server's random sequence no. & ack no. = client's + 1)
-	// 3) SYN = 0, sequence no. = client's + 1, ack no. = server's + 1, payload possible 
-	char buf[BUFLEN]; 
-	char message[BUFLEN]; 
+	// 3) SYN = 0, sequence no. = client's + 1, ack no. = server's + 1, payload possible
+	uint16_t buf[BUFLEN];
+	while(true) {
+		//SYN
+		Packet syn;
+		syn.setSYN();
+		syn.setSeqNo(rand() % BUFLEN);
+		vector<uint16_t> synVec = syn.encode();
+	   	if (sendto(sockfd, synVec, synVec.size(), 0 , (struct sockaddr *) &servaddr, slen) == -1)
+	   	{
+	   		perror("sendto()"); 
+	    }
+	    memset(buf,'\0', BUFLEN);
+	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
+	    {
+	    	perror("recvfrom()"); 
+	    }
+	    Packet synResponse(buf);
+	    //if valid SYN-ACK, break, otherwise loop
+	    if(synResponse.hasSYN() && synResponse.getAckNo() == syn.getSeqNo() + 1){
+	    	break;
+	    }
+	}
+
+
 	/*
 	unsigned int slen = sizeof(servaddr); 
 	while(1){
