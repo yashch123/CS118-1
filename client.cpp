@@ -34,7 +34,7 @@ void error(char *msg){
 
 int main(int argc, char **argv)
 {
-	// TODO: Parse command line arguments 
+	// Parse command line arguments 
 	if (argc != 3) {
 		cerr << "Usage: " << argv[0] << " <SERVER-HOST-OR-IP>" << " PORT-NUMBER" << endl; 
 		exit(1); 
@@ -80,13 +80,15 @@ int main(int argc, char **argv)
 	// 2) wait for SYN ACK (w/ server's random sequence no. & ack no. = client's + 1)
 	// 3) SYN = 0, sequence no. = client's + 1, ack no. = server's + 1, payload possible
 	uint16_t buf[BUFLEN];
+	unsigned int slen = sizeof(servaddr); 
+
 	while(true) {
 		//SYN
 		Packet syn;
 		syn.setSYN();
 		syn.setSeqNo(rand() % BUFLEN);
 		vector<uint16_t> synVec = syn.encode();
-	   	if (sendto(sockfd, synVec, synVec.size(), 0 , (struct sockaddr *) &servaddr, slen) == -1)
+	   	if (sendto(sockfd, synVec.data(), synVec.size(), 0 , (struct sockaddr *) &servaddr, slen) == -1)
 	   	{
 	   		perror("sendto()"); 
 	    }

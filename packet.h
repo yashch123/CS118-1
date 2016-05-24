@@ -65,9 +65,13 @@ Packet::Packet(uint16_t *arr) {
 	setAckNo(arr[1]);
 	setRcvWin(arr[2]);
 	setFlags(arr[3]);
-	for(int i = 4; i < size; i++) {
-		appendToSegment(arr[i]);
-	}
+
+	// Justin - Not sure what you meant to do here, modified it a little bit
+	// so the compiler error would go away 
+	// for (int i = 4; i < size; i++)
+	// 		appendToSegment(arr[i]); 
+	Segment s(arr + 4, arr + size);
+	appendToSegment(s); 
 }
 
 void Packet::setHeader(TcpHeader h) {
@@ -94,7 +98,7 @@ void Packet::setFlags(uint8_t flags) {
 	m_header.flags = flags;
 }
 int Packet::getSeqNo() {
-	return m_header.getSeqNo;
+	return m_header.seqNo;
 }
 
 int Packet::getAckNo() {
@@ -137,7 +141,7 @@ std::vector<uint16_t> Packet::encode() {
 	std::vector<uint16_t> v;
 	v.push_back(m_header.seqNo);
 	v.push_back(m_header.ackNo);
-	v.push_back(rcvWin);
+	v.push_back(m_header.rcvWin);
 	uint16_t f = m_header.flags | 0x0000;
 	v.push_back(f);
 	v.insert(v.end(), m_seg.begin(), m_seg.end());
