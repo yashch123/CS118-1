@@ -66,10 +66,6 @@ Packet::Packet(uint16_t *arr) {
 	setRcvWin(arr[2]);
 	setFlags(arr[3]);
 
-	// Justin - Not sure what you meant to do here, modified it a little bit
-	// so the compiler error would go away 
-	// for (int i = 4; i < size; i++)
-	// 		appendToSegment(arr[i]); 
 	Segment s(arr + 4, arr + size);
 	appendToSegment(s); 
 }

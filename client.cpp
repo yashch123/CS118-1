@@ -82,27 +82,61 @@ int main(int argc, char **argv)
 	uint16_t buf[BUFLEN];
 	unsigned int slen = sizeof(servaddr); 
 
+	uint16_t clientSeqNo = rand() % BUFLEN;
+	uint16_t ackToServer;
 	while(true) {
 		//SYN
 		Packet syn;
 		syn.setSYN();
-		syn.setSeqNo(rand() % BUFLEN);
+		syn.setSeqNo(clientSeqNo);
 		vector<uint16_t> synVec = syn.encode();
 	   	if (sendto(sockfd, synVec.data(), synVec.size(), 0 , (struct sockaddr *) &servaddr, slen) == -1)
 	   	{
-	   		perror("sendto()"); 
+	   		perror("sendto(): SYN"); 
+	    }
+	    memset(buf,'\0', BUFLEN);
+	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
+	    {
+	    	perror("recvfrom(): SYN-ACK"); 
+	    }
+	    Packet synResponse(buf);
+	    //if valid SYN-ACK, break, otherwise loop
+	    if(synResponse.hasSYN() && synResponse.hasACK() && synResponse.getAckNo() == clientSeqNo + 1) {
+	    	ackToServer = synResponse.getSeqNo() + 1;
+	    	clientSeqNo++;
+	    	break;
+	    }
+	    else {
+	    	perror("SYN-ACK invalid");
+	    }
+	}
+
+	while(true) {
+		//ACK
+		Packet ack;
+		ack.setACK();
+		ack.setAckNo(ackToServer);
+		vector<uint16_t> ackVec = ack.encode();
+		if (sendto(sockfd, ackVec.data(), ackVec.size(), 0 , (struct sockaddr *) &servaddr, slen) == -1)
+	   	{
+	   		perror("sendto(): ACK"); 
 	    }
 	    memset(buf,'\0', BUFLEN);
 	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
 	    {
 	    	perror("recvfrom()"); 
 	    }
-	    Packet synResponse(buf);
-	    //if valid SYN-ACK, break, otherwise loop
-	    if(synResponse.hasSYN() && synResponse.getAckNo() == syn.getSeqNo() + 1){
-	    	break;
-	    }
+	    Packet ackResponse(buf);
+	   	cout << ackResponse.getSeqNo() << " " << ackResponse.getAckNo() << endl;
+
+	   	//to be changed after we get the rest of this working
+	   	for (Segment::const_iterator i = ackResponse.getSegment().begin(); i != ackResponse.getSegment().end(); ++i)
+   			cout << *i << ' ';
+
+   		break;
 	}
+
+
 
 
 	/*
