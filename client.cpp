@@ -10,6 +10,7 @@
 #include <stdlib.h> 	// atoi 
 #include "client.h"
 
+#define PORTNUM 0
 #define BUFLEN 8192
 using namespace std;
 
@@ -71,8 +72,13 @@ int main(int argc, char **argv)
 		exit(1); 
 	}
 
+	// TODO: Set up TCP connection 
+	// 1) SYN w/ random sequence no. 
+	// 2) wait for SYN ACK (w/ server's random sequence no. & ack no. = client's + 1)
+	// 3) SYN = 0, sequence no. = client's + 1, ack no. = server's + 1, payload possible 
 	char buf[BUFLEN]; 
 	char message[BUFLEN]; 
+	/*
 	unsigned int slen = sizeof(servaddr); 
 	while(1){
 		cout << "Enter message : "; 
@@ -95,16 +101,9 @@ int main(int argc, char **argv)
          
         puts(buf);
     }
- 
+ 	*/ 
     close(sockfd);
     return 0;
-
-	// Try decoding server name as an IP address 
-
-	// TODO: Set up TCP connection 
-	// 1) SYN w/ random sequence no. 
-	// 2) wait for SYN ACK (w/ server's random sequence no. & ack no. = client's + 1)
-	// 3) SYN = 0, sequence no. = client's + 1, ack no. = server's + 1, payload possible 
 
 	// TODO: Receive file from server 
 	

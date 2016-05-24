@@ -10,6 +10,7 @@
 
 typedef std::vector<uint16_t> Segment;
 
+
 struct TcpHeader {
 public:
 	uint16_t seqNo;
@@ -41,6 +42,9 @@ public:
 	void setSYN(); 
 	void setACK(); 
 	void setFIN(); 
+	bool hasSYN(); 
+	bool hasACK(); 
+	bool hasFIN(); 
 	TcpHeader getHeader();
 	Segment getSegment();
 private:
@@ -99,6 +103,18 @@ void Packet::setACK() {
 
 void Packet::setFIN() { 
 	m_header.flags |= FIN; 
+}
+
+bool Packet::hasSYN() {
+	return (m_header.flags & SYN);
+}
+
+bool Packet::hasACK() {
+	return (m_header.flags & ACK);
+}
+
+bool Packet::hasFIN() {
+	return (m_header.flags & FIN);
 }
 
 TcpHeader Packet::getHeader() {
