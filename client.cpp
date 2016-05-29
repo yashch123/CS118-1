@@ -80,7 +80,7 @@ int main(int argc, char **argv)
 	// 2) wait for SYN ACK (w/ server's random sequence no. & ack no. = client's + 1)
 	// 3) SYN = 0, sequence no. = client's + 1, ack no. = server's + 1, payload possible
 	uint16_t buf[BUFLEN];
-	unsigned int slen = sizeof(servaddr); 
+	socklen_t slen = sizeof(servaddr); 
 
 	uint16_t clientSeqNo = rand() % BUFLEN;
 	uint16_t ackToServer;
