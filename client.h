@@ -19,7 +19,7 @@ void ReceivingBuffer::setInitSeq(uint16_t seqNo) {
 
 //if insertion fails, return nonzero
 uint16_t ReceivingBuffer::insert(uint16_t seqNo, Segment seg) {
-	if(seqNo - m_seqNo >= m_buffer.capacity()) {
+	if(seqNo - m_seqNo >= (uint16_t) m_buffer.capacity()) {
 		return 1;
 	}
 	m_buffer[seqNo - m_seqNo] = seg;

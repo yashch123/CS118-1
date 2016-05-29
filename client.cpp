@@ -1,6 +1,7 @@
 #include <string>
 #include <thread>
 #include <iostream>
+#include <iterator>
 
 #include <stdio.h> 
 #include <string.h> 	// memset, memcpy 

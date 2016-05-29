@@ -10,7 +10,7 @@
 #include <stdlib.h> 	// atoi, rand 
 #include "server.h"
 
-#define BUFSIZE 8192    // buffer size 
+#define BUFSIZE 1032    // buffer size 
 #define PORT 4000       // default port 
 #define MAX_SEQ_NO 30720 // in bytes 
 using namespace std;
@@ -22,14 +22,14 @@ int main(int argc, char **argv) {
 
 	struct sockaddr_in myaddr;      /* our address */
     struct sockaddr_in clientaddr;     /* remote address */
-    socklen_t addrlen = sizeof(remaddr);            /* length of addresses */
-    int recvlen;                    /* # bytes received */
+    socklen_t addrlen = sizeof(clientaddr);            /* length of addresses */
+    //int recvlen;                    /* # bytes received */
     int sockfd;                         /* our socket */
     uint16_t buf[BUFSIZE];     /* receive buffer */
 
     /* create a UDP socket */
 
-    if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("cannot create socket\n");
         exit(1); 
     }
@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
     myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     myaddr.sin_port = htons(PORT);
 
-    if (bind(fd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) {
+    if (bind(sockfd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) {
         perror("bind failed");
         exit(1); 
     }
@@ -55,8 +55,8 @@ int main(int argc, char **argv) {
     uint16_t serv_seqno; 
     while(true) {
         // wait for SYN
-        memset(buf,'\0', BUFLEN);
-        if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &clientaddr, &adrrlen) == -1)
+        memset(buf,'\0', BUFSIZE);
+        if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen) == -1)
         {
             perror("recvfrom(): SYN"); 
         }
@@ -82,12 +82,12 @@ int main(int argc, char **argv) {
         synack.setSeqNo(serv_seqno); 
         synack.setAckNo(ack_to_client); 
         vector<uint16_t> sav = synack.encode(); 
-        if (sendto(sockfd, ackVec.data(), ackVec.size(), 0 , (struct sockaddr *) &clientaddr, &addrlen) == -1)
+        if (sendto(sockfd, sav.data(), sav.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1)
         {
             perror("sendto(): SYNACK"); 
         }
-        memset(buf,'\0', BUFLEN);
-        if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &clientaddr, &adrrlen) == -1)
+        memset(buf,'\0', BUFSIZE);
+        if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen) == -1)
         {
             perror("recvfrom(): start of connection"); 
         }
@@ -113,6 +113,6 @@ int main(int argc, char **argv) {
     // 3) send client FIN
     // 4) wait for ACK 
 
-    close(fd);
+    close(sockfd);
     return 0;
 }
