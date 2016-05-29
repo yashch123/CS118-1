@@ -10,11 +10,13 @@
 #include <netdb.h> 		// gethostbyname
 #include <stdlib.h> 	// atoi, rand
 #include <ctype.h>		// isalpha
+#include <fstream>		// ofstream
 
 #include "client.h"
 
 #define PORTNUM 0
-#define BUFLEN 8192
+#define BUFLEN 1032
+#define MAXSEQNUM 30720
 using namespace std;
 
 /*******************
@@ -82,7 +84,7 @@ int main(int argc, char **argv)
 	uint16_t buf[BUFLEN];
 	unsigned int slen = sizeof(servaddr); 
 
-	uint16_t clientSeqNo = rand() % BUFLEN;
+	uint16_t clientSeqNo = rand() % MAXSEQNUM;
 	uint16_t ackToServer;
 	while(true) {
 		//SYN
@@ -103,7 +105,7 @@ int main(int argc, char **argv)
 	    //if valid SYN-ACK, break, otherwise loop
 	    if(synResponse.hasSYN() && synResponse.hasACK() && synResponse.getAckNo() == clientSeqNo + 1) {
 	    	ackToServer = synResponse.getSeqNo() + 1;
-	    	clientSeqNo++;
+	    	clientSeqNo = (clientSeqNo + 1) % MAXSEQNUM;
 	    	break;
 	    }
 	    else {
@@ -117,6 +119,7 @@ int main(int argc, char **argv)
 		ack.setACK();
 		ack.setAckNo(ackToServer);
 		vector<uint16_t> ackVec = ack.encode();
+		cout << "Sending ACK Packet " << ackToServer << endl;
 		if (sendto(sockfd, ackVec.data(), ackVec.size(), 0 , (struct sockaddr *) &servaddr, slen) == -1)
 	   	{
 	   		perror("sendto(): ACK"); 
@@ -127,52 +130,14 @@ int main(int argc, char **argv)
 	    	perror("recvfrom()"); 
 	    }
 	    Packet ackResponse(buf);
-	   	cout << ackResponse.getSeqNo() << " " << ackResponse.getAckNo() << endl;
-
-	   	//to be changed after we get the rest of this working
-	   	for (Segment::const_iterator i = ackResponse.getSegment().begin(); i != ackResponse.getSegment().end(); ++i)
-   			cout << *i << ' ';
+	    cout << "Receiving data packet " << ackResponse.getSeqNo() << endl;
+	   	ofstream outfile("file.txt", std::ios::out | std::ios::binary );
+		ostream_iterator<uint8_t> oi(outfile, ""); 
+		copy(ackResponse.getSegment().begin(), ackResponse.getSegment().end(), oi); 
 
    		break;
 	}
 
-
-
-
-	/*
-	unsigned int slen = sizeof(servaddr); 
-	while(1){
-		cout << "Enter message : "; 
-	    gets(message);
-         
-        //send the message
-        if (sendto(sockfd, message, strlen(message) , 0 , (struct sockaddr *) &servaddr, slen) == -1)
-        {
-            perror("sendto()"); 
-        }
-         
-        //receive a reply and print it
-        //clear the buffer by filling null, it might have previously received data
-        memset(buf,'\0', BUFLEN);
-        //try to receive some data, this is a blocking call
-        if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
-        {
-        	perror("recvfrom()"); 
-        }
-         
-        puts(buf);
-    }
- 	*/ 
     close(sockfd);
     return 0;
-
-	// TODO: Receive file from server 
-	
-	// Max payload: 1024 bytes 
-
-	// TODO: Connection teardown 
-	// 1) send FIN 
-	// 2) wait for ACK 
-	// 3) server closes, wait for FIN 
-	// 4) send ACK, wait for timeout, then close connection 
 }
