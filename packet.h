@@ -147,4 +147,4 @@ std::vector<uint16_t> Packet::encode() {
 void Packet::appendToSegment(Segment s) {
 	m_seg.insert(m_seg.end(), s.begin(), s.end());
 }
- #endif // PACKET_H}
+ #endif // PACKET_H

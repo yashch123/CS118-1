@@ -11,7 +11,7 @@
 #include "server.h"
 
 #define BUFSIZE 8192
-#define PORT 0
+#define PORT 4000
 using namespace std;
 
 int main(int argc, char **argv) {
@@ -44,6 +44,23 @@ int main(int argc, char **argv) {
         perror("bind failed");
         exit(1); 
     }
+
+    // TODO: Set up TCP connection 
+    // 1) wait for SYN 
+    // 2) respond with SYN (seq. no = random, ack. no = client's seq. no + 1)
+    // 3) wait for SYN = 0 (ack. no = our own seq. no + 1, seq. no = client's + 1)
+
+    // TODO: Start file transfer
+    // 1) Separate into segments of max size 1024 bytes (8192 bits) 
+    // 2) Start sending 
+    // 3) Keep in mind congestion window size & unacknowledged packets 
+    // 4) Resend packets if needed 
+    
+    // TODO: Terminate connection 
+    // 1) Wait for a FIN from client 
+    // 2) ACK the FIN
+    // 3) send client FIN
+    // 4) wait for ACK 
 
     close(fd);
     return 0;
