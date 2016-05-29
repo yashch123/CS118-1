@@ -7,11 +7,12 @@
 #include <netinet/in.h> // sockaddr_in
 #include <unistd.h> 	// close()
 #include <netdb.h> 		// gethostbyname
-#include <stdlib.h> 	// atoi 
+#include <stdlib.h> 	// atoi, rand 
 #include "server.h"
 
-#define BUFSIZE 8192
-#define PORT 0
+#define BUFSIZE 8192    // buffer size 
+#define PORT 4000       // default port 
+#define MAX_SEQ_NO 30720 // in bytes 
 using namespace std;
 
 int main(int argc, char **argv) {
@@ -20,11 +21,11 @@ int main(int argc, char **argv) {
 	////////////////////////////////
 
 	struct sockaddr_in myaddr;      /* our address */
-    struct sockaddr_in remaddr;     /* remote address */
+    struct sockaddr_in clientaddr;     /* remote address */
     socklen_t addrlen = sizeof(remaddr);            /* length of addresses */
     int recvlen;                    /* # bytes received */
-    int fd;                         /* our socket */
-    unsigned char buf[BUFSIZE];     /* receive buffer */
+    int sockfd;                         /* our socket */
+    uint16_t buf[BUFSIZE];     /* receive buffer */
 
     /* create a UDP socket */
 
@@ -44,6 +45,73 @@ int main(int argc, char **argv) {
         perror("bind failed");
         exit(1); 
     }
+
+    // DONE: Set up TCP connection 
+    // 1) wait for SYN 
+    // 2) respond with SYN (seq. no = random, ack. no = client's seq. no + 1)
+    // 3) wait for SYN = 0 (ack. no = our own seq. no + 1, seq. no = client's + 1)
+
+    uint16_t ack_to_client; 
+    uint16_t serv_seqno; 
+    while(true) {
+        // wait for SYN
+        memset(buf,'\0', BUFLEN);
+        if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &clientaddr, &adrrlen) == -1)
+        {
+            perror("recvfrom(): SYN"); 
+        }
+        Packet pkt(buf);
+        //if valid SYN, break and respond to client 
+        if (pkt.hasSYN()) {
+            ack_to_client = pkt.getSeqNo() + 1; 
+            serv_seqno = rand() % MAX_SEQ_NO; 
+            break;
+        }
+        else {
+            continue; 
+        }
+    }
+
+    // set up connection buffers & variables here 
+
+    while(true) {
+        // respond with SYN (seq. no = random, ack. no = client's seq. no + 1)
+        Packet synack; 
+        synack.setSYN(); 
+        synack.setACK(); 
+        synack.setSeqNo(serv_seqno); 
+        synack.setAckNo(ack_to_client); 
+        vector<uint16_t> sav = synack.encode(); 
+        if (sendto(sockfd, ackVec.data(), ackVec.size(), 0 , (struct sockaddr *) &clientaddr, &addrlen) == -1)
+        {
+            perror("sendto(): SYNACK"); 
+        }
+        memset(buf,'\0', BUFLEN);
+        if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &clientaddr, &adrrlen) == -1)
+        {
+            perror("recvfrom(): start of connection"); 
+        }
+        Packet pkt(buf); 
+        // wait for SYN = 0 (ack. no = our own seq. no + 1, seq. no = client's + 1)
+        if (!pkt.hasSYN() && pkt.getSeqNo() == (ack_to_client + 1) && pkt.getAckNo() == (serv_seqno + 1)){
+            // increment sequence number & ack number doesn't matter? 
+            serv_seqno++;
+            break; 
+        }
+        // else continue 
+    }
+    
+    // TODO: Start file transfer
+    // 1) Separate into segments of max size 1024 bytes (8192 bits) 
+    // 2) Start sending 
+    // 3) Keep in mind congestion window size & unacknowledged packets 
+    // 4) Resend packets if needed 
+    
+    // TODO: Terminate connection 
+    // 1) Wait for a FIN from client 
+    // 2) ACK the FIN
+    // 3) send client FIN
+    // 4) wait for ACK 
 
     close(fd);
     return 0;
