@@ -16,10 +16,15 @@
 using namespace std;
 
 int main(int argc, char **argv) {
-	////////////////////////////////
-	// Don't trust this code ///////
-	////////////////////////////////
+    // Parse command-line args 
+    if (argc != 3) {
+        cerr << "Usage: " << argv[0] << " <PORT-NUMBER>" << "FILENAME" << endl; 
+        exit(1); 
+    }
 
+    int port = atoi(argv[1]); 
+    string filename(argv[2]); 
+    
 	struct sockaddr_in myaddr;      /* our address */
     struct sockaddr_in clientaddr;     /* remote address */
     socklen_t addrlen = sizeof(clientaddr);            /* length of addresses */
