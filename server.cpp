@@ -98,13 +98,15 @@ int main(int argc, char **argv) {
             perror("sendto(): SYNACK"); 
         }
         memset(buf,'\0', BUFSIZE);
+        cerr << "Sent SYNACK" << endl;
         if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen) == -1)
         {
             perror("recvfrom(): start of connection"); 
         }
+        cerr << "Received ACK" << endl;
         Packet pkt(buf); 
         // wait for SYN = 0 (ack. no = our own seq. no + 1, seq. no = client's + 1)
-        if (!pkt.hasSYN() && pkt.getSeqNo() == (ack_to_client + 1) && pkt.getAckNo() == (serv_seqno + 1)){
+        if (pkt.getSeqNo() == (ack_to_client) && pkt.hasACK() && pkt.getAckNo() == (serv_seqno+1)){
             // increment sequence number & ack number doesn't matter? 
             serv_seqno++;
             break; 

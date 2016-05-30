@@ -127,15 +127,18 @@ int main(int argc, char **argv)
 	while(true) {
 		//ACK
 		Packet ack;
+		ack.setSeqNo(clientSeqNo);
 		ack.setACK();
 		ack.setAckNo(ackToServer);
 		vector<uint16_t> ackVec = ack.encode();
 		cout << "Sending ACK Packet " << ackToServer << endl;
-		if (sendto(sockfd, ackVec.data(), ackVec.size(), 0 , (struct sockaddr *) &servaddr, slen) == -1)
+		if (sendto(sockfd, ackVec.data(), sizeof(ackVec), 0 , (struct sockaddr *) &servaddr, slen) == -1)
 	   	{
 	   		perror("sendto(): ACK"); 
 	    }
 	    memset(buf,'\0', BUFLEN);
+	    cerr << "We made it fam" << endl;
+	    cerr << "About to receive data" << endl;
 	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
 	    {
 	    	perror("recvfrom()"); 
@@ -148,7 +151,6 @@ int main(int argc, char **argv)
 
    		break;
 	}
-	cerr << "We made it fam" << endl;
 
     close(sockfd);
     return 0;
