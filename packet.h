@@ -64,7 +64,7 @@ Packet::Packet(uint16_t *arr) {
 	setAckNo(arr[1]);
 	setRcvWin(arr[2]);
 	setFlags(arr[3]);
-
+	
 	Segment s(arr + 4, arr + size);
 	appendToSegment(s); 
 }

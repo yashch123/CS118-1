@@ -8,6 +8,8 @@
 #include <unistd.h> 	// close()
 #include <netdb.h> 		// gethostbyname
 #include <stdlib.h> 	// atoi, rand 
+#include <fcntl.h>
+
 #include "server.h"
 
 #define BUFSIZE 1032    // buffer size 
@@ -23,7 +25,6 @@ int main(int argc, char **argv) {
     }
 
     int port = atoi(argv[1]); 
-    string filename(argv[2]); 
     
 	struct sockaddr_in myaddr;      /* our address */
     struct sockaddr_in clientaddr;     /* remote address */
@@ -115,14 +116,27 @@ int main(int argc, char **argv) {
     }
     cerr << "Connection Set Up" << endl;
 
-    Packet response;
-    int fd = open(filename, O_RDONLY);
+    int fd = open(argv[2], O_RDONLY);
     int ret;
     while ( (ret = read(fd, buf, sizeof(buf))) != 0) {
-        Segment payload(buf);
+        cerr << "Printing out buffer AKA file" << endl;
+        cerr << (char*) buf << endl;
+        Packet response;
+        Segment payload(buf, buf + ret/2);
+        for (auto p = payload.begin(); p != payload.end(); p++) {
+            cerr << (char) *p;
+            cerr << (char) ((*p) >> 8);
+        }
+        cerr << endl;
         response.appendToSegment(payload);
         response.setSeqNo(serv_seqno);
         Segment file = response.encode();
+        cerr << "Printing file chunk content" << endl;
+        for (auto p = file.begin()+4; p != file.end(); p++) {
+            cerr << (char) *p;
+            cerr << (char) ((*p) >> 8);
+        }
+        cerr << "Sending file chunk" << endl;
         if (sendto(sockfd, file.data(), sizeof(file), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1)
         {
             perror("sendto(): FILE"); 
@@ -130,7 +144,7 @@ int main(int argc, char **argv) {
         serv_seqno += ret;
         memset(buf,'\0', BUFSIZE);
     }
-    
+    close(fd);
     // TODO: Start file transfer
     // 1) Separate into segments of max size 1024 bytes (8192 bits) 
     // 2) Start sending 

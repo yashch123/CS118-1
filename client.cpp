@@ -12,6 +12,7 @@
 #include <stdlib.h> 	// atoi, rand
 #include <ctype.h>		// isalpha
 #include <fstream>		// ofstream
+#include <fcntl.h>
 
 #include "client.h"
 
@@ -66,6 +67,7 @@ int main(int argc, char **argv)
 		perror("socket creation failed"); 
 		exit(1); 
 	}
+	//fcntl(sockfd, F_SETFL, O_NONBLOCK);
 
 	// bind to arbitrary return address since no application will initiate communication here
 	// INADDR_ANY lets OS choose specific IP address 
@@ -139,17 +141,31 @@ int main(int argc, char **argv)
 	    memset(buf,'\0', BUFLEN);
 	    cerr << "We made it fam" << endl;
 	    cerr << "About to receive data" << endl;
-	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
+	    int ret = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen);
+	    cerr << "ret = " << ret << endl;
+	    if (ret == -1)
 	    {
 	    	perror("recvfrom()"); 
+	    	break;
 	    }
+	    if (ret == 0)
+	    	break;
+	    cerr << "Printing out buffer AKA file" << endl;
+        Segment payload(buf + 4, buf + 4 + ret);
+        for (auto p = buf + 4; p != buf + 4 + ret; p++) {
+            cerr << (char) *p;
+            cerr << (char) ((*p) >> 8);
+        }
+        cerr << "START" << endl;
 	    Packet ackResponse(buf);
+	    for (auto p = ackResponse.getSegment().begin(); p != ackResponse.getSegment().end(); p++)
+		    cerr << (char*) *p;
+		cerr << endl;
+		cerr << "END" << endl;
 	    cout << "Receiving data packet " << ackResponse.getSeqNo() << endl;
 	   	ofstream outfile("file.txt", std::ios::out | std::ios::binary );
-		ostream_iterator<uint8_t> oi(outfile, ""); 
-		copy(ackResponse.getSegment().begin(), ackResponse.getSegment().end(), oi); 
-
-   		break;
+		ostream_iterator<uint16_t> oi(outfile, ""); 
+		copy(ackResponse.getSegment().begin(), ackResponse.getSegment().end(), oi);
 	}
 
     close(sockfd);
