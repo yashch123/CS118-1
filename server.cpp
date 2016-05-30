@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
     memset((char *)&myaddr, 0, sizeof(myaddr));
     myaddr.sin_family = AF_INET;
     myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    myaddr.sin_port = htons(PORT);
+    myaddr.sin_port = htons(port);
 
     if (bind(sockfd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) {
         perror("bind failed");
@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
 
     uint16_t ack_to_client; 
     uint16_t serv_seqno; 
+    cerr << "Waiting for SYN" << endl;
     while(true) {
         // wait for SYN
         memset(buf,'\0', BUFSIZE);
@@ -65,7 +66,11 @@ int main(int argc, char **argv) {
         {
             perror("recvfrom(): SYN"); 
         }
+        cerr << "Server received packet (SYN)" << endl;
         Packet pkt(buf);
+        vector<uint16_t> v = pkt.encode();
+        for(auto p = v.begin(); p != v.end(); p++)
+            cerr << *p << endl;
         //if valid SYN, break and respond to client 
         if (pkt.hasSYN()) {
             ack_to_client = pkt.getSeqNo() + 1; 
@@ -73,12 +78,13 @@ int main(int argc, char **argv) {
             break;
         }
         else {
+            cerr << "SYN packet didn't have SYN set" << endl;
             continue; 
         }
     }
 
     // set up connection buffers & variables here 
-
+    cerr << "About to respond with SYN/ACK" << endl;
     while(true) {
         // respond with SYN (seq. no = random, ack. no = client's seq. no + 1)
         Packet synack; 
@@ -87,7 +93,7 @@ int main(int argc, char **argv) {
         synack.setSeqNo(serv_seqno); 
         synack.setAckNo(ack_to_client); 
         vector<uint16_t> sav = synack.encode(); 
-        if (sendto(sockfd, sav.data(), sav.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1)
+        if (sendto(sockfd, sav.data(), sizeof(sav), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1)
         {
             perror("sendto(): SYNACK"); 
         }
@@ -105,6 +111,7 @@ int main(int argc, char **argv) {
         }
         // else continue 
     }
+    cerr << "Connection Set Up" << endl;
     
     // TODO: Start file transfer
     // 1) Separate into segments of max size 1024 bytes (8192 bits) 

@@ -58,6 +58,8 @@ int main(int argc, char **argv)
 	else 
 		memcpy((void *)&servaddr.sin_addr, argv[1], strlen(argv[1])); 
 
+	cerr << "gethostbyname:" << hp->h_addr_list[0] << endl;
+
 	// Create client socket
 	int sockfd; 
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { 
@@ -87,22 +89,30 @@ int main(int argc, char **argv)
 
 	uint16_t clientSeqNo = rand() % MAXSEQNUM;
 	uint16_t ackToServer;
+	cerr << "Entering SYN while loop" << endl;
 	while(true) {
 		//SYN
 		Packet syn;
 		syn.setSYN();
 		syn.setSeqNo(clientSeqNo);
 		vector<uint16_t> synVec = syn.encode();
-	   	if (sendto(sockfd, synVec.data(), synVec.size(), 0 , (struct sockaddr *) &servaddr, slen) == -1)
+		for(auto p = synVec.begin(); p != synVec.end(); p++)
+            cerr << *p << endl;
+	   	if (sendto(sockfd, synVec.data(), sizeof(synVec), 0 , (struct sockaddr *) &servaddr, slen) == -1)
 	   	{
 	   		perror("sendto(): SYN"); 
 	    }
 	    memset(buf,'\0', BUFLEN);
+	   	cerr << "Sendto Worked... Recvfrom about to be called" << endl;
 	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
 	    {
 	    	perror("recvfrom(): SYN-ACK"); 
 	    }
 	    Packet synResponse(buf);
+	    cerr << "printing out synResponse encoded" << endl;
+	    vector<uint16_t> v = synResponse.encode();
+	    for(auto p = v.begin(); p != v.end(); p++)
+            cerr << *p << endl;
 	    //if valid SYN-ACK, break, otherwise loop
 	    if(synResponse.hasSYN() && synResponse.hasACK() && synResponse.getAckNo() == clientSeqNo + 1) {
 	    	ackToServer = synResponse.getSeqNo() + 1;
@@ -113,7 +123,7 @@ int main(int argc, char **argv)
 	    	perror("SYN-ACK invalid");
 	    }
 	}
-
+	cerr << "Sending ACK" << endl;
 	while(true) {
 		//ACK
 		Packet ack;
@@ -138,6 +148,7 @@ int main(int argc, char **argv)
 
    		break;
 	}
+	cerr << "We made it fam" << endl;
 
     close(sockfd);
     return 0;

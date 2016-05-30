@@ -16,8 +16,7 @@ public:
 	uint16_t seqNo;
  	uint16_t ackNo;
  	uint16_t rcvWin;
- 	uint8_t reserved;
- 	uint8_t flags = 0;
+ 	uint16_t flags = 0;
  };
 
 /*******************************
@@ -37,7 +36,7 @@ public:
 	void setSeqNo(uint16_t seqNo);
 	void setAckNo(uint16_t ackNo);
 	void setRcvWin(uint16_t rcvWin);
-	void setFlags(uint8_t flags);
+	void setFlags(uint16_t flags);
 	int getSeqNo();
 	int getAckNo();
 	void setSYN(); 
@@ -90,7 +89,7 @@ void Packet::setRcvWin(uint16_t rcvWin) {
 	m_header.rcvWin = rcvWin;
 }
 
-void Packet::setFlags(uint8_t flags) {
+void Packet::setFlags(uint16_t flags) {
 	m_header.flags = flags;
 }
 int Packet::getSeqNo() {
@@ -138,8 +137,7 @@ std::vector<uint16_t> Packet::encode() {
 	v.push_back(m_header.seqNo);
 	v.push_back(m_header.ackNo);
 	v.push_back(m_header.rcvWin);
-	uint16_t f = m_header.flags | 0x0000;
-	v.push_back(f);
+	v.push_back(m_header.flags);
 	v.insert(v.end(), m_seg.begin(), m_seg.end());
 	return v;
 }
