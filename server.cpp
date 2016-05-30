@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
         synack.setACK(); 
         synack.setSeqNo(serv_seqno); 
         synack.setAckNo(ack_to_client); 
-        vector<uint16_t> sav = synack.encode(); 
+        Segment sav = synack.encode(); 
         if (sendto(sockfd, sav.data(), sizeof(sav), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1)
         {
             perror("sendto(): SYNACK"); 
@@ -114,6 +114,22 @@ int main(int argc, char **argv) {
         // else continue 
     }
     cerr << "Connection Set Up" << endl;
+
+    Packet response;
+    int fd = open(filename, O_RDONLY);
+    int ret;
+    while ( (ret = read(fd, buf, sizeof(buf))) != 0) {
+        Segment payload(buf);
+        response.appendToSegment(payload);
+        response.setSeqNo(serv_seqno);
+        Segment file = response.encode();
+        if (sendto(sockfd, file.data(), sizeof(file), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1)
+        {
+            perror("sendto(): FILE"); 
+        }
+        serv_seqno += ret;
+        memset(buf,'\0', BUFSIZE);
+    }
     
     // TODO: Start file transfer
     // 1) Separate into segments of max size 1024 bytes (8192 bits) 
