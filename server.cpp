@@ -20,7 +20,7 @@ using namespace std;
 int main(int argc, char **argv) {
     // Parse command-line args 
     if (argc != 3) {
-        cerr << "Usage: " << argv[0] << " <PORT-NUMBER>" << "FILENAME" << endl; 
+        cerr << "Usage: " << argv[0] << " <PORT-NUMBER>" << "<FILENAME>" << endl; 
         exit(1); 
     }
 

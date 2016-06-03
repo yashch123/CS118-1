@@ -86,6 +86,7 @@ int main(int argc, char **argv)
 		exit(1); 
 	}
 
+	// seed 
 	srand(time(null));
 	uint16_t clientSeqNo = rand() % MAXSEQNUM;
 	uint16_t nextAckNo;
@@ -99,32 +100,67 @@ int main(int argc, char **argv)
     int ret;
 
 	/*-----------------Begin TCP Handshake-----------------*/
-
-	Packet syn;
-	syn.setSYN();
-	syn.setSeqNo(clientSeqNo);
-
-
-
-
+	// Housekeeping 
+	uint8_t buf[BUFLEN];
+	socklen_t addrlen = sizeof(servaddr); 
+	bool setup = true; 
+	int ret; // return value of recvfrom 
+	int flag; 
 
 
 	// I (Connor) have only gone to here in client, still need to check all the other stuff below (change types and structure etc)
+	// Cool story bro - Anderson 
 
+	// Restructuring: 
+	// buffer now deals with bytes, NOT shorts 
+	// One single while loop to handle packets 
+	// Segment is encoded packet 
+	// packet is classful segment 
+	// Data and Segment both vector of uint8_t 
+	// Should we use a queue instead of a vec?
+	// TODO: 
+	// 1) Restructure
+	// 2) Integrate Receive Buffer into packet 
+	// 3) Congestion, flow control, retransmissions, timeout, select 
 
+	while(1) { 
+		Packet p;
+		// Eventually pop_back 
 
+		// First prep a packet to send 
+		if (setup) {
+			// Send first SYN
+			p.setSYN(); 
+			p.setSeqNo(clientSeqNo); 
+			Segment s = p.encode(); 
+			setup = false; 
+		}
+		else { 
+			switch (flag) {
+				case SYN: 
+				case ACK: 
+				case FIN: 
+			}
+		}
+		if (sendto(sockfd, synVec.data(), sizeof(synVec), 0 , (struct sockaddr *) &servaddr, addrlen) == -1) {
+	   		perror("sendto()"); 
+	    }
+	    if ((ret = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &addrlen)) == -1) {
+	    	perror("recvfrom()"); 
+	    }
 
+	    // Assume received message for now 
+	    Segment response; 
+	    response.insert(response.begin(), buf, buf + ret); 
+	    Packet response_packet(response); 
+	}
 
-
-
-
+	/******************* Old code *****************************
 
 	// TODO: Set up TCP connection 
 	// 1) SYN w/ random sequence no. 
 	// 2) wait for SYN ACK (w/ server's random sequence no. & ack no. = client's + 1)
 	// 3) SYN = 0, sequence no. = client's + 1, ack no. = server's + 1, payload possible
-	uint16_t buf[BUFLEN];
-	socklen_t slen = sizeof(servaddr); 
 
 	
 	while(true) {
@@ -135,12 +171,12 @@ int main(int argc, char **argv)
 		Segment synVec = syn.encode();
 		for(auto p = synVec.begin(); p != synVec.end(); p++)
             cerr << *p << endl;
-	   	if (sendto(sockfd, synVec.data(), sizeof(synVec), 0 , (struct sockaddr *) &servaddr, slen) == -1)
+	   	if (sendto(sockfd, synVec.data(), sizeof(synVec), 0 , (struct sockaddr *) &servaddr, addrlen) == -1)
 	   	{
 	   		perror("sendto(): SYN"); 
 	    }
 	    memset(buf,'\0', BUFLEN);
-	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
+	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &addrlen) == -1)
 	    {
 	    	perror("recvfrom(): SYN-ACK"); 
 	    }
@@ -165,12 +201,12 @@ int main(int argc, char **argv)
 		ack.setAckNo(ackToServer);
 		vector<uint16_t> ackVec = ack.encode();
 		cout << "Sending ACK Packet " << ackToServer << endl;
-		if (sendto(sockfd, ackVec.data(), sizeof(ackVec), 0 , (struct sockaddr *) &servaddr, slen) == -1)
+		if (sendto(sockfd, ackVec.data(), sizeof(ackVec), 0 , (struct sockaddr *) &servaddr, addrlen) == -1)
 	   	{
 	   		perror("sendto(): ACK"); 
 	    }
 	    memset(buf,'\0', BUFLEN);
-	    int ret = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen);
+	    int ret = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &addrlen);
 	    cerr << "ret = " << ret << endl;
 	    if (ret == -1)
 	    {
@@ -197,6 +233,7 @@ int main(int argc, char **argv)
 		copy(ackResponse.getSegment().begin(), ackResponse.getSegment().end(), oi);
 	}
 
+	***************************** Old Code **********************/ 
     close(sockfd);
     return 0;
 }

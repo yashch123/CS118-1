@@ -53,6 +53,10 @@ private:
 	Data m_data;
 };
 
+//////////////////////////////////////////
+/////////// Constructors /////////////////
+//////////////////////////////////////////
+
 Packet::Packet() {
 	//nothing to do
 }
@@ -65,6 +69,10 @@ Packet::Packet(Segment encoded) {
 	
 	m_data.insert(m_data.end(), encoded.begin() + 8, encoded.end());
 }
+
+//////////////////////////////////////////
+/////////////// Setters  /////////////////
+//////////////////////////////////////////
 
 void Packet::setHeader(TcpHeader header) {
 	m_header = header;
@@ -90,14 +98,6 @@ void Packet::setFlags(uint16_t flags) {
 	m_header.flags = flags;
 }
 
-int Packet::getSeqNo() {
-	return m_header.seqNo;
-}
-
-int Packet::getAckNo() {
-	return m_header.ackNo;
-}
-
 void Packet::setSYN() { 
 	m_header.flags |= SYN; 
 }
@@ -108,6 +108,18 @@ void Packet::setACK() {
 
 void Packet::setFIN() { 
 	m_header.flags |= FIN; 
+}
+
+//////////////////////////////////////////
+/////////////// Getters  /////////////////
+//////////////////////////////////////////
+
+int Packet::getSeqNo() {
+	return m_header.seqNo;
+}
+
+int Packet::getAckNo() {
+	return m_header.ackNo;
 }
 
 bool Packet::hasSYN() {
@@ -129,6 +141,10 @@ TcpHeader Packet::getHeader() {
 Data Packet::getData() {
 	return m_data;
 }
+
+//////////////////////////////////////////
+////// Auxiliary Functions  //////////////
+//////////////////////////////////////////
 
 Segment Packet::encode() {
 	Segment v;
