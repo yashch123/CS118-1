@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cstdint> 
+#include <iostream>
 
 #define FIN 0x1
 #define SYN 0x2
@@ -48,6 +49,7 @@ public:
 	TcpHeader getHeader();
 	Data getData();
 	Segment encode();
+	void toString();
 private:
 	TcpHeader m_header;
 	Data m_data;
@@ -177,6 +179,24 @@ Segment Packet::encode() {
 	// Data
 	v.insert(v.end(), m_data.begin(), m_data.end());
 	return v;
+}
+
+//print contents of packet to standard error
+void Packet::toString() {
+	std::cerr << "Packet contents: " << std::endl;
+	std::cerr << "seqNo: " << m_header.seqNo << "\t" << "ackNo: " << m_header.ackNo << std::endl;
+	std::cerr << "rcvWin: " << m_header.rcvWin << "\t" << "Flags: ";
+	if(hasSYN())
+		std::cerr << "S";
+	if(hasACK())
+		std::cerr << "A";
+	if(hasFIN())
+		std::cerr << "F";
+	std::cerr << std::endl;
+	for(Data::iterator i = m_data.begin(); i != m_data.end(); i++) {
+		std::cerr << *i << "\t";
+	}
+	std::cerr << std::endl;
 }
 
 #endif // PACKET_H

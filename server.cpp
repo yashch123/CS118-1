@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     socklen_t addrlen = sizeof(clientaddr);            /* length of addresses */
     //int recvlen;                    /* # bytes received */
     int sockfd;                         /* our socket */
-    uint16_t buf[BUFSIZE];     /* receive buffer */
+    uint8_t buf[BUFSIZE];     /* receive buffer */
 
     /* create a UDP socket */
 
@@ -46,8 +46,8 @@ int main(int argc, char **argv) {
     myaddr.sin_family = AF_INET;
     myaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     myaddr.sin_port = htons(port);
-
-    if (bind(sockfd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) {
+    //need the :: because otherwise it uses the wrong function
+    if (::bind(sockfd, (struct sockaddr *)&myaddr, sizeof(myaddr)) < 0) { 
         perror("bind failed");
         exit(1); 
     }
@@ -68,10 +68,9 @@ int main(int argc, char **argv) {
             perror("recvfrom(): SYN"); 
         }
         cerr << "Server received packet (SYN)" << endl;
-        Packet pkt(buf);
-        vector<uint16_t> v = pkt.encode();
-        for(auto p = v.begin(); p != v.end(); p++)
-            cerr << *p << endl;
+        Segment s(buf, buf + sizeof(buf)/sizeof(buf[0]));
+        Packet pkt(s);
+        pkt.toString();
         //if valid SYN, break and respond to client 
         if (pkt.hasSYN()) {
             ack_to_client = pkt.getSeqNo() + 1; 
@@ -105,8 +104,9 @@ int main(int argc, char **argv) {
             perror("recvfrom(): start of connection"); 
         }
         cerr << "Received ACK" << endl;
-        Packet pkt(buf); 
-        // wait for SYN = 0 (ack. no = our own seq. no + 1, seq. no = client's + 1)
+        Segment s (buf, buf + sizeof(buf)/sizeof(buf[0]));
+        Packet pkt(s); 
+        pkt.toString();
         if (pkt.getSeqNo() == (ack_to_client) && pkt.hasACK() && pkt.getAckNo() == (serv_seqno+1)){
             // increment sequence number & ack number doesn't matter? 
             serv_seqno++;
@@ -114,29 +114,18 @@ int main(int argc, char **argv) {
         }
         // else continue 
     }
-    cerr << "Connection Set Up" << endl;
+    cerr << "Handshake complete" << endl;
 
     int fd = open(argv[2], O_RDONLY);
     int ret;
     while ( (ret = read(fd, buf, sizeof(buf))) != 0) {
-        cerr << "Printing out buffer AKA file" << endl;
-        cerr << (char*) buf << endl;
         Packet response;
-        Segment payload(buf, buf + ret/2);
-        for (auto p = payload.begin(); p != payload.end(); p++) {
-            cerr << (char) *p;
-            cerr << (char) ((*p) >> 8);
-        }
-        cerr << endl;
-        response.appendToSegment(payload);
+        Data payload(buf, buf + ret);
+        response.setData(payload);
         response.setSeqNo(serv_seqno);
         Segment file = response.encode();
-        cerr << "Printing file chunk content" << endl;
-        for (auto p = file.begin()+4; p != file.end(); p++) {
-            cerr << (char) *p;
-            cerr << (char) ((*p) >> 8);
-        }
         cerr << "Sending file chunk" << endl;
+        response.toString();
         if (sendto(sockfd, file.data(), sizeof(file), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1)
         {
             perror("sendto(): FILE"); 
