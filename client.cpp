@@ -5,14 +5,15 @@
 
 #include <stdio.h> 
 #include <string.h> 	// memset, memcpy 
-#include <sys/socket.h> // socket API 
+#include <sys/socket.h> // socket API
+#include <sys/select.h> // select
 #include <netinet/in.h> // sockaddr_in
 #include <unistd.h> 	// close()
 #include <netdb.h> 		// gethostbyname
 #include <stdlib.h> 	// atoi, rand
 #include <ctype.h>		// isalpha
 #include <fstream>		// ofstream
-#include <fcntl.h>
+#include <time.h>
 
 #include "client.h"
 
@@ -44,6 +45,12 @@ int main(int argc, char **argv)
 		exit(1); 
 	}
 
+
+
+	/*-----------------Setting up the Client-----------------*/
+
+
+
 	// Decode hostname
 	// argv[1] = hostname/IP, argv[2] = port #
 	struct sockaddr_in servaddr;
@@ -59,15 +66,12 @@ int main(int argc, char **argv)
 	else 
 		memcpy((void *)&servaddr.sin_addr, argv[1], strlen(argv[1])); 
 
-	cerr << "gethostbyname:" << hp->h_addr_list[0] << endl;
-
 	// Create client socket
 	int sockfd; 
 	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) { 
 		perror("socket creation failed"); 
 		exit(1); 
 	}
-	//fcntl(sockfd, F_SETFL, O_NONBLOCK);
 
 	// bind to arbitrary return address since no application will initiate communication here
 	// INADDR_ANY lets OS choose specific IP address 
@@ -82,6 +86,39 @@ int main(int argc, char **argv)
 		exit(1); 
 	}
 
+	srand(time(null));
+	uint16_t clientSeqNo = rand() % MAXSEQNUM;
+	uint16_t nextAckNo;
+	ReceivingBuffer receive;
+	fd_set readFds, writeFds, errFds, watchFds;
+    FD_ZERO(&readFds);
+    FD_ZERO(&writeFds);
+    FD_ZERO(&errFds);
+    FD_ZERO(&watchFds);
+
+    int ret;
+
+	/*-----------------Begin TCP Handshake-----------------*/
+
+	Packet syn;
+	syn.setSYN();
+	syn.setSeqNo(clientSeqNo);
+
+
+
+
+
+
+	// I (Connor) have only gone to here in client, still need to check all the other stuff below (change types and structure etc)
+
+
+
+
+
+
+
+
+
 	// TODO: Set up TCP connection 
 	// 1) SYN w/ random sequence no. 
 	// 2) wait for SYN ACK (w/ server's random sequence no. & ack no. = client's + 1)
@@ -89,15 +126,13 @@ int main(int argc, char **argv)
 	uint16_t buf[BUFLEN];
 	socklen_t slen = sizeof(servaddr); 
 
-	uint16_t clientSeqNo = rand() % MAXSEQNUM;
-	uint16_t ackToServer;
-	cerr << "Entering SYN while loop" << endl;
+	
 	while(true) {
 		//SYN
 		Packet syn;
 		syn.setSYN();
 		syn.setSeqNo(clientSeqNo);
-		vector<uint16_t> synVec = syn.encode();
+		Segment synVec = syn.encode();
 		for(auto p = synVec.begin(); p != synVec.end(); p++)
             cerr << *p << endl;
 	   	if (sendto(sockfd, synVec.data(), sizeof(synVec), 0 , (struct sockaddr *) &servaddr, slen) == -1)
@@ -105,16 +140,13 @@ int main(int argc, char **argv)
 	   		perror("sendto(): SYN"); 
 	    }
 	    memset(buf,'\0', BUFLEN);
-	   	cerr << "Sendto Worked... Recvfrom about to be called" << endl;
 	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen) == -1)
 	    {
 	    	perror("recvfrom(): SYN-ACK"); 
 	    }
+	    Segment newPacket = vector(buf, buf+)
 	    Packet synResponse(buf);
-	    cerr << "printing out synResponse encoded" << endl;
 	    vector<uint16_t> v = synResponse.encode();
-	    for(auto p = v.begin(); p != v.end(); p++)
-            cerr << *p << endl;
 	    //if valid SYN-ACK, break, otherwise loop
 	    if(synResponse.hasSYN() && synResponse.hasACK() && synResponse.getAckNo() == clientSeqNo + 1) {
 	    	ackToServer = synResponse.getSeqNo() + 1;
@@ -125,7 +157,6 @@ int main(int argc, char **argv)
 	    	perror("SYN-ACK invalid");
 	    }
 	}
-	cerr << "Sending ACK" << endl;
 	while(true) {
 		//ACK
 		Packet ack;
@@ -139,8 +170,6 @@ int main(int argc, char **argv)
 	   		perror("sendto(): ACK"); 
 	    }
 	    memset(buf,'\0', BUFLEN);
-	    cerr << "We made it fam" << endl;
-	    cerr << "About to receive data" << endl;
 	    int ret = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &slen);
 	    cerr << "ret = " << ret << endl;
 	    if (ret == -1)

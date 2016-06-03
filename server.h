@@ -11,7 +11,7 @@ public:
 	bool hasSpace(uint16_t size = 1024);
 	void insert(Segment seg);
 	uint16_t nextSegSeq();
-	Segment getSeg(uint16_t);
+	Segment getSeg(uint16_t seq); // Not sure what this does
 private:
 	uint16_t m_seqNo;
 	TcpHeader m_header;

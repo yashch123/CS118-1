@@ -8,8 +8,8 @@
 #define SYN 0x2
 #define ACK 0x4 
 
-typedef std::vector<uint16_t> Segment;
-
+typedef std::vector<uint8_t> Segment;
+typedef std::vector<uint8_t> Data;
 
 struct TcpHeader {
 public:
@@ -30,9 +30,9 @@ Flag format of TCP Header
 class Packet {
 public:
 	Packet();
-	Packet(uint16_t *arr);
-	void setHeader(TcpHeader h);
-	void setSegment(Segment seg);
+	Packet(Segment encoded);
+	void setHeader(TcpHeader header);
+	void setData(Data data);
 	void setSeqNo(uint16_t seqNo);
 	void setAckNo(uint16_t ackNo);
 	void setRcvWin(uint16_t rcvWin);
@@ -46,35 +46,32 @@ public:
 	bool hasACK(); 
 	bool hasFIN(); 
 	TcpHeader getHeader();
-	Segment getSegment();
-	std::vector<uint16_t> encode();
-	void appendToSegment(Segment s);
+	Data getData();
+	Segment encode();
 private:
 	TcpHeader m_header;
-	Segment m_seg;
+	Data m_data;
 };
 
 Packet::Packet() {
 	//nothing to do
 }
 
-Packet::Packet(uint16_t *arr) {
-	int size = sizeof(arr)/sizeof(arr[0]);
-	setSeqNo(arr[0]);
-	setAckNo(arr[1]);
-	setRcvWin(arr[2]);
-	setFlags(arr[3]);
+Packet::Packet(Segment encoded) {
+	setSeqNo((encoded[0] << 8) 	| encoded[1]);
+	setAckNo((encoded[2] << 8) 	| encoded[3]);
+	setRcvWin((encoded[4] << 8) | encoded[5]);
+	setFlags((encoded[6] << 8) 	| encoded[7]);
 	
-	Segment s(arr + 4, arr + size);
-	appendToSegment(s); 
+	m_data.insert(m_data.end(), encoded.begin() + 8, encoded.end());
 }
 
-void Packet::setHeader(TcpHeader h) {
-	m_header = h;
+void Packet::setHeader(TcpHeader header) {
+	m_header = header;
 }
 
-void Packet::setSegment(Segment seg) {
-	m_seg = seg;
+void Packet::setData(Data data) {
+	m_data = data;
 }
 
 void Packet::setSeqNo(uint16_t seqNo) {
@@ -92,6 +89,7 @@ void Packet::setRcvWin(uint16_t rcvWin) {
 void Packet::setFlags(uint16_t flags) {
 	m_header.flags = flags;
 }
+
 int Packet::getSeqNo() {
 	return m_header.seqNo;
 }
@@ -128,21 +126,41 @@ TcpHeader Packet::getHeader() {
 	return m_header;
 }
 
-Segment Packet::getSegment() {
-	return m_seg;
+Data Packet::getData() {
+	return m_data;
 }
 
-std::vector<uint16_t> Packet::encode() {
-	std::vector<uint16_t> v;
-	v.push_back(m_header.seqNo);
-	v.push_back(m_header.ackNo);
-	v.push_back(m_header.rcvWin);
-	v.push_back(m_header.flags);
-	v.insert(v.end(), m_seg.begin(), m_seg.end());
+Segment Packet::encode() {
+	Segment v;
+	uint8_t firstHalf, secondHalf;
+
+	// Sequence Number
+	firstHalf = m_header.seqNo >> 8;
+	secondHalf = m_header.seqNo;
+	v.push_back(firstHalf);
+	v.push_back(secondHalf);
+
+	// Ack Number
+	firstHalf = m_header.ackNo >> 8;
+	secondHalf = m_header.ackNo;
+	v.push_back(firstHalf);
+	v.push_back(secondHalf);
+
+	// Receive Window
+	firstHalf = m_header.rcvWin >> 8;
+	secondHalf = m_header.rcvWin;
+	v.push_back(firstHalf);
+	v.push_back(secondHalf);
+
+	// Flags
+	firstHalf = m_header.flags >> 8;
+	secondHalf = m_header.flags;
+	v.push_back(firstHalf);
+	v.push_back(secondHalf);
+
+	// Data
+	v.insert(v.end(), m_data.begin(), m_data.end());
 	return v;
 }
 
-void Packet::appendToSegment(Segment s) {
-	m_seg.insert(m_seg.end(), s.begin(), s.end());
-}
- #endif // PACKET_H
+#endif // PACKET_H
