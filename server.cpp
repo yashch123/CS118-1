@@ -139,13 +139,73 @@ int main(int argc, char **argv) {
     // 2) Start sending 
     // 3) Keep in mind congestion window size & unacknowledged packets 
     // 4) Resend packets if needed 
-    
-    // TODO: Terminate connection 
-    // 1) Wait for a FIN from client 
-    // 2) ACK the FIN
-    // 3) send client FIN
-    // 4) wait for ACK 
 
-    close(sockfd);
+    //TCP teardown
+    while(true) {
+        // wait for FIN
+        memset(buf,'\0', BUFSIZE);
+        if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen) == -1)
+        {
+            perror("recvfrom(): FIN"); 
+        }
+        cerr << "Server received packet (FIN)" << endl;
+        Segment s(buf, buf + sizeof(buf)/sizeof(buf[0]));
+        Packet pkt(s);
+        pkt.toString();
+        if (pkt.getSeqNo() == ack_to_client) {
+            if(pkt.hasFIN()) {
+                //if valid FIN, proceed to send ACK
+                ack_to_client = pkt.getSeqNo() + 1;
+                Packet ack;
+                ack.setSeqNo(serv_seqno);
+                ack.setAckNo(ack_to_client);
+                ack.setACK(); 
+                Segment a = ack.encode();
+                if (sendto(sockfd, a.data(), sizeof(a), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1) {
+                    perror("sendto(): ACK response to FIN"); 
+                }
+
+                //after sending ACK, send FIN
+                Packet fin;
+                fin.setSeqNo(serv_seqno);
+                fin.setFIN();
+                Segment f = fin.encode();
+                if (sendto(sockfd, f.data(), sizeof(f), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1) {
+                    perror("sendto(): FIN response to FIN"); 
+                }
+
+                //wait for final ACK
+                cerr << "Waiting for final ACK" << endl;
+                while(true) {
+                    memset(buf,'\0', BUFSIZE);
+                    if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen) == -1) {
+                        perror("recvfrom(): final ACK"); 
+                    }
+                    cerr << "Server received final ACK" << endl;
+                    Segment final(buf, buf + sizeof(buf)/sizeof(buf[0]));
+                    Packet finalPacket(final);
+                    finalPacket.toString();
+                    //upon receipt of ACK, close socket
+                    if(finalPacket.hasACK() && finalPacket.getAckNo() == serv_seqno + 1) {
+                        close(sockfd);
+                        return 0;
+                    }
+                    else {
+                        cerr << "Final ACK response: invalid ACK" << endl;
+                        continue;
+                    }
+                }
+            }
+            else {
+                cerr << "FIN packet: FIN not set" << endl;
+                continue;
+            }
+        }
+        else {
+            cerr << "FIN packet: invalid seqNo" << endl;
+            continue; 
+        }
+    }
+
     return 0;
 }
