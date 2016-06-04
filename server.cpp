@@ -142,70 +142,48 @@ int main(int argc, char **argv) {
 
     //TCP teardown
     while(true) {
-        // wait for FIN
+        //send FIN
+        Packet fin;
+        fin.setSeqNo(serv_seqno);
+        fin.setFIN();
+        Segment f = fin.encode();
+        if (sendto(sockfd, f.data(), sizeof(f), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1) {
+            perror("sendto(): FIN"); 
+        }
+        serv_seqno++;
+
+        // wait for ACK
         memset(buf,'\0', BUFSIZE);
         if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen) == -1)
         {
-            perror("recvfrom(): FIN"); 
+            perror("recvfrom(): teardown ACK"); 
         }
-        cerr << "Server received packet (FIN)" << endl;
+        cerr << "Server received packet (teardown ACK)" << endl;
         Segment s(buf, buf + sizeof(buf)/sizeof(buf[0]));
         Packet pkt(s);
         pkt.toString();
-        if (pkt.getSeqNo() == ack_to_client) {
-            if(pkt.hasFIN()) {
-                //if valid FIN, proceed to send ACK
-                ack_to_client = pkt.getSeqNo() + 1;
-                Packet ack;
-                ack.setSeqNo(serv_seqno);
-                ack.setAckNo(ack_to_client);
-                ack.setACK(); 
-                Segment a = ack.encode();
-                if (sendto(sockfd, a.data(), sizeof(a), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1) {
-                    perror("sendto(): ACK response to FIN"); 
-                }
-
-                //after sending ACK, send FIN
-                Packet fin;
-                fin.setSeqNo(serv_seqno);
-                fin.setFIN();
-                Segment f = fin.encode();
-                if (sendto(sockfd, f.data(), sizeof(f), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1) {
-                    perror("sendto(): FIN response to FIN"); 
-                }
-
-                //wait for final ACK
-                cerr << "Waiting for final ACK" << endl;
-                while(true) {
-                    memset(buf,'\0', BUFSIZE);
-                    if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen) == -1) {
-                        perror("recvfrom(): final ACK"); 
-                    }
-                    cerr << "Server received final ACK" << endl;
-                    Segment final(buf, buf + sizeof(buf)/sizeof(buf[0]));
-                    Packet finalPacket(final);
-                    finalPacket.toString();
-                    //upon receipt of ACK, close socket
-                    if(finalPacket.hasACK() && finalPacket.getAckNo() == serv_seqno + 1) {
-                        close(sockfd);
-                        return 0;
-                    }
-                    else {
-                        cerr << "Final ACK response: invalid ACK" << endl;
-                        continue;
-                    }
-                }
+        if(pkt.hasACK() && pkt.getAckNo() == serv_seqno) {
+            //wait for FIN
+            memset(buf,'\0', BUFSIZE);
+            if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen) == -1) {
+                perror("recvfrom(): final ACK"); 
             }
-            else {
-                cerr << "FIN packet: FIN not set" << endl;
-                continue;
+            cerr << "Server received packet (teardown FIN)" << endl;
+            Segment segF(buf, buf + sizeof(buf)/sizeof(buf[0]));
+            Packet pF(segF);
+            pF.toString();
+            if(pF.hasFIN()) {
+                Packet finalAck;
+                finalAck.setSeqNo(serv_seqno);
+                finalAck.setAckNo(ack_to_client);
+                finalAck.setACK();
+                if (sendto(sockfd, finalAck.data(), sizeof(finalAck), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1) {
+                    perror("sendto(): final ACK"); 
+                }
+                close(sockfd);
+                return 0;
             }
-        }
-        else {
-            cerr << "FIN packet: invalid seqNo" << endl;
-            continue; 
         }
     }
-
     return 0;
 }
