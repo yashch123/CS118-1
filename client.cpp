@@ -119,6 +119,7 @@ int main(int argc, char **argv)
 	while(1) {
 		if (current_state == CLOSE) {
 			// WAIT FOR SOMETIME
+			rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);
 			Packet finPacket;
 			finPacket.setFIN();
 			finPacket.setSeqNo(rcvbuf.getSeqNo());
@@ -157,7 +158,7 @@ int main(int argc, char **argv)
 				// CHECK CASE WHERE ACK GETS LOST?????????
 				if (current_packet.hasFIN()) {
 					current_state = CLOSE;
-					ackNo = current_packet.getSeqNo() + 1; 						
+					ackNo = (current_packet.getSeqNo() + 1) % MAXSEQNO; 						
 					break;
 				}
 				// If the packet is in the window

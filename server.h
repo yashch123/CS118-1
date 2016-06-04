@@ -17,9 +17,11 @@ public:
 	void ack(uint16_t ackNo);
 	void timeout();
 	bool hasSpace(uint16_t size = 1024);
-	void insert(Packet p);
+	uint16_t insert(Packet p);
 	uint16_t nextSegSeq();
 	Segment getSeg(uint16_t seq); // Not sure what this does
+	bool isEmpty();
+	void toString();
 private:
 	uint16_t m_seqNo;	//sequence number
 	uint16_t m_currentWinSize;	//current number of bytes in the network
@@ -39,10 +41,15 @@ private:
 
 void OutputBuffer::setInitSeq(uint16_t seqNo) {
 	m_seqNo = seqNo;
+	m_currentWinSize = 0;
+	m_maxWinSize = 1024;
 }
 
 void OutputBuffer::ack(uint16_t ackNo) {
-	m_map.erase(ackNo);
+	if(m_map.find(ackNo) != m_map.end()) {
+		m_currentWinSize -= (m_map[ackNo].size() - 8);
+		m_map.erase(ackNo);
+	}
 }
 
 void OutputBuffer::timeout() {
@@ -50,14 +57,24 @@ void OutputBuffer::timeout() {
 }
 
 bool OutputBuffer::hasSpace(uint16_t size) {
-	return (m_maxWinSize - m_currentWinSize < size);
+	return ((m_maxWinSize - m_currentWinSize) <= size);
 }
 
-void OutputBuffer::insert(Packet p) {
+uint16_t OutputBuffer::insert(Packet p) {
 	//main loop must call hasSpace before to avoid congestion
+	int ackNo;
+	if(p.hasSYN() || p.hasFIN()) {
+		ackNo = (nextSegSeq() + 1) % MAXSEQNO;
+	}
+	else {
+		ackNo = (nextSegSeq() + p.getData().size() + 1) % MAXSEQNO;
+	}
+	p.setSeqNo(nextSegSeq());
 	Segment s = p.encode();
-	m_map[p.getSeqNo()] = s;
+	m_map[ackNo] = s;
 	m_seqNo = (m_seqNo + p.getData().size()) % MAXSEQNO;
+	m_currentWinSize += (p.getData().size());
+	return ackNo;
 }
 
 uint16_t OutputBuffer::nextSegSeq() {
@@ -66,6 +83,18 @@ uint16_t OutputBuffer::nextSegSeq() {
 
 Segment OutputBuffer::getSeg(uint16_t seq) {
 	return m_map[seq];
+}
+
+bool OutputBuffer::isEmpty() {
+	return m_map.empty();
+}
+
+void OutputBuffer::toString() {
+	std::cerr << "Buffer contents: " << std::endl;
+	std::cerr << "Size: " << m_map.size() << std::endl;
+	for(std::unordered_map<uint16_t, Segment>::iterator i = m_map.begin(); i != m_map.end(); i++) {
+		std::cerr << i->first << "\t" <<  std::endl;
+	}
 }
 
 FileReader::FileReader(std::string filename) {
