@@ -17,10 +17,16 @@
 
 #include "client.h"
 
-#define PORTNUM 0
+#define PORTNUM 4000
 #define BUFLEN 1032
-#define MAXSEQNUM 30720
+
 using namespace std;
+
+enum state {
+	SYNWAIT,
+	CONNECTED, 
+	CLOSE
+};
 
 /*******************
 struct sockaddr_in {
@@ -87,25 +93,100 @@ int main(int argc, char **argv)
 	}
 
 	// seed 
-	srand(time(null));
-	uint16_t clientSeqNo = rand() % MAXSEQNUM;
-	uint16_t nextAckNo;
-	ReceivingBuffer receive;
-	fd_set readFds, writeFds, errFds, watchFds;
-    FD_ZERO(&readFds);
-    FD_ZERO(&writeFds);
-    FD_ZERO(&errFds);
-    FD_ZERO(&watchFds);
+	srand(time(NULL));
+	ReceivingBuffer rcvbuf;
+	rcvbuf.setSeqNo(rand() % MAXSEQNUM);
+	// uint16_t serverSeqNum;
 
     int ret;
 
 	/*-----------------Begin TCP Handshake-----------------*/
 	// Housekeeping 
 	uint8_t buf[BUFLEN];
-	socklen_t addrlen = sizeof(servaddr); 
-	bool setup = true; 
-	int ret; // return value of recvfrom 
-	int flag; 
+	memset(buf,'\0', BUFLEN);
+	socklen_t addrlen = sizeof(servaddr);
+	uint16_t ackNo;
+
+	// Create syn 
+	state current_state = SYNWAIT; 
+	Packet syn_packet; 
+	syn_packet.setSYN(); 
+	syn_packet.setSeqNo(rcvbuf.getSeqNo());
+	Segment syn_encoded = syn_packet.encode(); 
+	if (sendto(sockfd, syn_encoded.data(), sizeof(syn_encoded), 0 , (struct sockaddr *) &servaddr, addrlen) == -1) {
+	   	perror("sendto()"); 
+	}
+
+	// Enter finite state machine loop 
+	while(1) {
+		if (current_state == CLOSE) {
+			// WAIT FOR SOMETIME
+			Packet finPacket;
+			finPacket.setFIN();
+			finPacket.setSeqNo(rcvbuf.getSeqNo());
+			Segment finSend = finPacket.encode();
+			cerr << "Sending FIN" << endl;
+			//finPacket.toString();
+			if (sendto(sockfd, finSend.data(), sizeof(finSend), 0 , (struct sockaddr *) &servaddr, addrlen) == -1) {
+	   			perror("sendto(): ACK"); 
+	   		}
+	   		break;
+		}
+		memset(buf,'\0', BUFLEN);
+		if ((ret = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &addrlen)) == -1) {
+	    	perror("recvfrom()"); 
+	    }
+	    Segment seg(buf, buf + ret); 
+	    Packet current_packet(seg); 
+		current_packet.toString();
+		switch(current_state) { 
+			case SYNWAIT:
+				// check for ACK 
+				// if not correct, send again
+				if(current_packet.hasSYN() && current_packet.hasACK() && current_packet.getAckNo() == rcvbuf.getSeqNo() + 1) {
+	    			ackNo = current_packet.getSeqNo() + 1;
+	    			rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNUM);
+	    			current_state = CONNECTED;
+	    		}
+	    		else {
+	    			perror("SYN-ACK invalid");
+	    		}
+	    		break; 
+
+			case CONNECTED:
+				// CHECK CASE WHERE ACK GETS LOST?????????
+				if (current_packet.hasFIN()) {
+					current_state = CLOSE;
+					break;
+				}
+				// If the packet is in the window
+				rcvbuf.insert(current_packet);
+	    		ackNo = current_packet.getSeqNo() + current_packet.getData().size() + 1; 	    		
+				// store packet in receive buffer 
+				break;
+			default:
+				perror("How did you get here?");
+		}
+
+		Packet ack;
+		ack.setSeqNo(rcvbuf.getSeqNo());
+		ack.setACK();
+		ack.setAckNo(ackNo);
+		Segment toSend = ack.encode();
+		cout << "Sending ACK Packet " << ackNo << endl;
+		if (sendto(sockfd, toSend.data(), sizeof(toSend), 0 , (struct sockaddr *) &servaddr, addrlen) == -1)
+	   	{
+	   		perror("sendto(): ACK"); 
+	    }
+	}
+
+	rcvbuf.sortBuffer();
+	vector<DataSeqPair> fileBuf = rcvbuf.getBuffer();
+	ofstream outfile("file.txt", std::ios::out | std::ios::binary );
+	ostream_iterator<uint8_t> oi(outfile, "");
+	for (auto i = fileBuf.begin(); i != fileBuf.end(); i++) {
+		copy((*i).data.begin(), (*i).data.end(), oi);
+	}
 
 
 	// I (Connor) have only gone to here in client, still need to check all the other stuff below (change types and structure etc)
@@ -122,38 +203,6 @@ int main(int argc, char **argv)
 	// 1) Restructure
 	// 2) Integrate Receive Buffer into packet 
 	// 3) Congestion, flow control, retransmissions, timeout, select 
-
-	while(1) { 
-		Packet p;
-		// Eventually pop_back 
-
-		// First prep a packet to send 
-		if (setup) {
-			// Send first SYN
-			p.setSYN(); 
-			p.setSeqNo(clientSeqNo); 
-			Segment s = p.encode(); 
-			setup = false; 
-		}
-		else { 
-			switch (flag) {
-				case SYN: 
-				case ACK: 
-				case FIN: 
-			}
-		}
-		if (sendto(sockfd, synVec.data(), sizeof(synVec), 0 , (struct sockaddr *) &servaddr, addrlen) == -1) {
-	   		perror("sendto()"); 
-	    }
-	    if ((ret = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &addrlen)) == -1) {
-	    	perror("recvfrom()"); 
-	    }
-
-	    // Assume received message for now 
-	    Segment response; 
-	    response.insert(response.begin(), buf, buf + ret); 
-	    Packet response_packet(response); 
-	}
 
 	/******************* Old code *****************************
 

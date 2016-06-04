@@ -5,6 +5,7 @@
 #include <cstdint> 
 #include <iostream>
 
+#define MAXSEQNUM 30720 // moved here b/c both client & server both need this 
 #define FIN 0x1
 #define SYN 0x2
 #define ACK 0x4 
@@ -14,9 +15,9 @@ typedef std::vector<uint8_t> Data;
 
 struct TcpHeader {
 public:
-	uint16_t seqNo;
- 	uint16_t ackNo;
- 	uint16_t rcvWin;
+	uint16_t seqNo = 0;
+ 	uint16_t ackNo = 0;
+ 	uint16_t rcvWin = 0;
  	uint16_t flags = 0;
  };
 
@@ -60,7 +61,7 @@ private:
 //////////////////////////////////////////
 
 Packet::Packet() {
-	//nothing to do
+	m_data.clear();
 }
 
 Packet::Packet(Segment encoded) {
@@ -68,7 +69,7 @@ Packet::Packet(Segment encoded) {
 	setAckNo((encoded[2] << 8) 	| encoded[3]);
 	setRcvWin((encoded[4] << 8) | encoded[5]);
 	setFlags((encoded[6] << 8) 	| encoded[7]);
-	
+	// m_data.clear();
 	m_data.insert(m_data.end(), encoded.begin() + 8, encoded.end());
 }
 
@@ -193,8 +194,9 @@ void Packet::toString() {
 	if(hasFIN())
 		std::cerr << "F";
 	std::cerr << std::endl;
+	std::cerr << "Payload size: " << m_data.size() << std::endl;
 	for(Data::iterator i = m_data.begin(); i != m_data.end(); i++) {
-		std::cerr << *i << "\t";
+		std::cerr << *i;
 	}
 	std::cerr << std::endl;
 }
