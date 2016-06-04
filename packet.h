@@ -5,7 +5,9 @@
 #include <cstdint> 
 #include <iostream>
 
-#define MAXSEQNUM 30720 // moved here b/c both client & server both need this 
+#define MAXSEQNO 30720 // moved here b/c both client & server both need this
+#define MAXPAYLOAD 1024
+#define BUFSIZE 1032
 #define FIN 0x1
 #define SYN 0x2
 #define ACK 0x4 
@@ -70,7 +72,10 @@ Packet::Packet(Segment encoded) {
 	setRcvWin((encoded[4] << 8) | encoded[5]);
 	setFlags((encoded[6] << 8) 	| encoded[7]);
 	// m_data.clear();
-	m_data.insert(m_data.end(), encoded.begin() + 8, encoded.end());
+	if (encoded.size() > 8) {
+		m_data.clear();
+		m_data.insert(m_data.begin(), encoded.begin() + 8, encoded.end());
+	}
 }
 
 //////////////////////////////////////////

@@ -10,9 +10,6 @@
 
 #include "server.h"
 
-#define BUFSIZE 1032    // buffer size 
-#define PORT 4000       // default port 
-
 using namespace std;
 
 int main(int argc, char **argv) {
@@ -62,7 +59,8 @@ int main(int argc, char **argv) {
     while(true) {
         // wait for SYN
         memset(buf,'\0', BUFSIZE);
-        if ((ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen)) == -1)
+        ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
+        if (ret < 0)
         {
             perror("recvfrom(): SYN"); 
         }
@@ -77,7 +75,7 @@ int main(int argc, char **argv) {
             break;
         }
         else {
-            cerr << "SYN packet didn't have SYN set" << endl;
+            perror("SYN packet didn't have SYN set");
             continue; 
         }
     }
@@ -92,13 +90,14 @@ int main(int argc, char **argv) {
         synack.setSeqNo(serv_seqno); 
         synack.setAckNo(ack_to_client); 
         Segment sav = synack.encode(); 
-        if (sendto(sockfd, sav.data(), sizeof(sav), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1)
+        if (sendto(sockfd, sav.data(), sav.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0)
         {
             perror("sendto(): SYNACK"); 
         }
         memset(buf,'\0', BUFSIZE);
         cerr << "Sent SYNACK" << endl;
-        if ((ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen)) == -1)
+        ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
+        if (ret < 0)
         {
             perror("recvfrom(): start of connection"); 
         }
@@ -115,25 +114,44 @@ int main(int argc, char **argv) {
     }
     cerr << "Handshake complete" << endl;
 
-    int fd = open(argv[2], O_RDONLY);
-    memset(buf,'\0', BUFSIZE);
-    while ( (ret = read(fd, buf, sizeof(buf))) != 0) {
+    FileReader reader(argv[2]);
+    while (reader.hasMore()) {
         Packet response;
         Data payload(buf, buf + ret);
-        response.setData(payload);
+        response.setData(reader.top());
+        reader.pop();
         // seed later 
         response.setSeqNo(serv_seqno);
         Segment file = response.encode();
         cerr << "Sending file chunk" << endl;
         response.toString();
-        if (sendto(sockfd, file.data(), sizeof(file), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1)
+        if (sendto(sockfd, file.data(), file.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0)
         {
             perror("sendto(): FILE"); 
         }
         serv_seqno += ret;
         memset(buf,'\0', BUFSIZE);
     }
-    close(fd);
+
+    // int fd = open(argv[2], O_RDONLY);
+    // memset(buf,'\0', BUFSIZE);
+    // while ( (ret = read(fd, buf, BUFSIZE)) > 0) {
+    //     cerr << "ret: " << ret << endl;
+    //     Packet response;
+    //     Data payload(buf, buf + ret);
+    //     response.setData(payload);
+    //     // seed later 
+    //     response.setSeqNo(serv_seqno);
+    //     Segment file = response.encode();
+    //     cerr << "Sending file chunk" << endl;
+    //     response.toString();
+    //     if (sendto(sockfd, file.data(), file.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0)
+    //     {
+    //         perror("sendto(): FILE"); 
+    //     }
+    //     serv_seqno += ret;
+    //     memset(buf,'\0', BUFSIZE);
+    //close(fd);
     // TODO: Start file transfer
     // 1) Separate into segments of max size 1024 bytes (8192 bits) 
     // 2) Start sending 
@@ -147,7 +165,7 @@ int main(int argc, char **argv) {
         fin.setSeqNo(serv_seqno);
         fin.setFIN();
         Segment f = fin.encode();
-        if (sendto(sockfd, f.data(), sizeof(f), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1) {
+        if (sendto(sockfd, f.data(), f.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
             perror("sendto(): FIN"); 
         }
         serv_seqno++;
@@ -155,13 +173,15 @@ int main(int argc, char **argv) {
         // wait for ACK
         while(true) {
             memset(buf,'\0', BUFSIZE);
-            if ((ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen)) == -1)
+            ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
+            if (ret < 0)
             {
                 perror("recvfrom(): teardown ACK"); 
                 memset(buf,'\0', BUFSIZE);
                 continue;
             }
             cerr << "Server received packet (teardown ACK)" << endl;
+            cerr << "serv_seqno: " << serv_seqno << endl;
             Segment s(buf, buf + ret);
             Packet pkt(s);
             pkt.toString();
@@ -169,7 +189,8 @@ int main(int argc, char **argv) {
                 //wait for FIN
                 while(true) {
                     memset(buf,'\0', BUFSIZE);
-                    if ((ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen)) == -1) {
+                    ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
+                    if (ret < 0) {
                         perror("recvfrom(): final ACK"); 
                     }
                     cerr << "Server received packet (teardown FIN)" << endl;
@@ -182,21 +203,21 @@ int main(int argc, char **argv) {
                         finalAck.setAckNo(ack_to_client);
                         finalAck.setACK();
                         Segment fA = finalAck.encode();
-                        if (sendto(sockfd, fA.data(), sizeof(fA), 0 , (struct sockaddr *) &clientaddr, addrlen) == -1) {
+                        if (sendto(sockfd, fA.data(), fA.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
                             perror("sendto(): final ACK"); 
                         }
                         close(sockfd);
                         return 0;
                     }
                     else {
-                        cerr << "Invalid FIN" << endl;
+                        perror("Invalid FIN");
                         memset(buf,'\0', BUFSIZE);
                         continue;
                     }
                 }
             }
             else {
-                cerr << "Invalid teardown ACK" << endl;
+                perror("Invalid teardown ACK");
                 memset(buf,'\0', BUFSIZE);
                 continue;
             }

@@ -10,8 +10,6 @@
 
 #include "packet.h"
 
-#define MAXPAYLOAD 1024
-#define MAXSEQNO 30720 // in bytes 
 
 class OutputBuffer {
 public:

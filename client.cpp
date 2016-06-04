@@ -17,9 +17,6 @@
 
 #include "client.h"
 
-#define PORTNUM 4000
-#define BUFLEN 1032
-
 using namespace std;
 
 enum state {
@@ -95,17 +92,17 @@ int main(int argc, char **argv)
 	// seed 
 	srand(time(NULL));
 	ReceivingBuffer rcvbuf;
-	rcvbuf.setSeqNo(rand() % MAXSEQNUM);
+	rcvbuf.setSeqNo(rand() % MAXSEQNO);
 	// uint16_t serverSeqNum;
 
     int ret;
 
 	/*-----------------Begin TCP Handshake-----------------*/
 	// Housekeeping 
-	uint8_t buf[BUFLEN];
-	memset(buf,'\0', BUFLEN);
+	uint8_t buf[BUFSIZE];
+	memset(buf,'\0', BUFSIZE);
 	socklen_t addrlen = sizeof(servaddr);
-	uint16_t ackNo;
+	uint16_t ackNo = 0;
 
 	// Create syn 
 	state current_state = SYNWAIT; 
@@ -113,7 +110,8 @@ int main(int argc, char **argv)
 	syn_packet.setSYN(); 
 	syn_packet.setSeqNo(rcvbuf.getSeqNo());
 	Segment syn_encoded = syn_packet.encode(); 
-	if (sendto(sockfd, syn_encoded.data(), sizeof(syn_encoded), 0 , (struct sockaddr *) &servaddr, addrlen) == -1) {
+	syn_packet.toString();
+	if (sendto(sockfd, syn_encoded.data(), syn_encoded.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
 	   	perror("sendto()"); 
 	}
 
@@ -124,20 +122,22 @@ int main(int argc, char **argv)
 			Packet finPacket;
 			finPacket.setFIN();
 			finPacket.setSeqNo(rcvbuf.getSeqNo());
+			finPacket.toString();
 			Segment finSend = finPacket.encode();
 			cerr << "Sending FIN" << endl;
 			//finPacket.toString();
-			if (sendto(sockfd, finSend.data(), sizeof(finSend), 0 , (struct sockaddr *) &servaddr, addrlen) == -1) {
+			if (sendto(sockfd, finSend.data(), finSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
 	   			perror("sendto(): ACK"); 
 	   		}
 	   		break;
 		}
-		memset(buf,'\0', BUFLEN);
-		if ((ret = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &addrlen)) == -1) {
+		memset(buf,'\0', BUFSIZE);
+		ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen);
+		if (ret < 0) {
 	    	perror("recvfrom()"); 
 	    }
-	    Segment seg(buf, buf + ret); 
-	    Packet current_packet(seg); 
+	    Segment seg(buf, buf + ret);
+	    Packet current_packet(seg);
 		current_packet.toString();
 		switch(current_state) { 
 			case SYNWAIT:
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
 				// if not correct, send again
 				if(current_packet.hasSYN() && current_packet.hasACK() && current_packet.getAckNo() == rcvbuf.getSeqNo() + 1) {
 	    			ackNo = current_packet.getSeqNo() + 1;
-	    			rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNUM);
+	    			rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);
 	    			current_state = CONNECTED;
 	    		}
 	    		else {
@@ -157,6 +157,7 @@ int main(int argc, char **argv)
 				// CHECK CASE WHERE ACK GETS LOST?????????
 				if (current_packet.hasFIN()) {
 					current_state = CLOSE;
+					ackNo = current_packet.getSeqNo() + 1; 						
 					break;
 				}
 				// If the packet is in the window
@@ -174,7 +175,7 @@ int main(int argc, char **argv)
 		ack.setAckNo(ackNo);
 		Segment toSend = ack.encode();
 		cout << "Sending ACK Packet " << ackNo << endl;
-		if (sendto(sockfd, toSend.data(), sizeof(toSend), 0 , (struct sockaddr *) &servaddr, addrlen) == -1)
+		if (sendto(sockfd, toSend.data(), toSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
 	   	{
 	   		perror("sendto(): ACK"); 
 	    }
@@ -220,12 +221,12 @@ int main(int argc, char **argv)
 		Segment synVec = syn.encode();
 		for(auto p = synVec.begin(); p != synVec.end(); p++)
             cerr << *p << endl;
-	   	if (sendto(sockfd, synVec.data(), sizeof(synVec), 0 , (struct sockaddr *) &servaddr, addrlen) == -1)
+	   	if (sendto(sockfd, synVec.data(), sizeof(synVec), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
 	   	{
 	   		perror("sendto(): SYN"); 
 	    }
-	    memset(buf,'\0', BUFLEN);
-	    if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &addrlen) == -1)
+	    memset(buf,'\0', BUFSIZE);
+	    if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen) < 0)
 	    {
 	    	perror("recvfrom(): SYN-ACK"); 
 	    }
@@ -250,14 +251,14 @@ int main(int argc, char **argv)
 		ack.setAckNo(ackToServer);
 		vector<uint16_t> ackVec = ack.encode();
 		cout << "Sending ACK Packet " << ackToServer << endl;
-		if (sendto(sockfd, ackVec.data(), sizeof(ackVec), 0 , (struct sockaddr *) &servaddr, addrlen) == -1)
+		if (sendto(sockfd, ackVec.data(), sizeof(ackVec), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
 	   	{
 	   		perror("sendto(): ACK"); 
 	    }
-	    memset(buf,'\0', BUFLEN);
-	    int ret = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *) &servaddr, &addrlen);
+	    memset(buf,'\0', BUFSIZE);
+	    int ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen);
 	    cerr << "ret = " << ret << endl;
-	    if (ret == -1)
+	    if (ret < 0)
 	    {
 	    	perror("recvfrom()"); 
 	    	break;

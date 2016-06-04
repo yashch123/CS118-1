@@ -27,7 +27,7 @@ private:
 	// Initial sequence number
 	uint16_t m_seqNo;
 	// Buffer is a vector of packet data and sequence number pairs
-	uint16_t m_cumSeqNo; 
+	//uint16_t m_cumSeqNo; 
 	int m_round; // keeps track of round number since sequence numbers may become non-unique 
 	std::vector<DataSeqPair> m_buffer;
 };
@@ -44,8 +44,10 @@ void ReceivingBuffer::setSeqNo(uint16_t seqNo) {
 uint16_t ReceivingBuffer::insert(Packet p) {
 	// Set up a DataSeqPair
 	DataSeqPair toInsert;
-	toInsert.seq = p.getSeqNo() + (m_round * MAXSEQNUM);	// MAXSEQNO = 30720 
+	toInsert.seq = p.getSeqNo() + (m_round * MAXSEQNO);	// MAXSEQNO = 30720 
 	toInsert.data = p.getData();
+	if (toInsert.data.size() + p.getSeqNo() > MAXSEQNO)
+		m_round++;
 	m_buffer.push_back(toInsert);
 
 	// TODO Deal with out of order packets	
