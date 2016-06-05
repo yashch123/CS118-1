@@ -21,7 +21,7 @@ client: $(CLIENT_FILES:.cpp=.o)
 	$(CXX) -o $@ $(CXXFLAGS) $(CLIENT_FILES:.cpp=.o)
 
 clean:
-	rm -rf *.o *~ *.gch *.swp *.dSYM server client *.tar.gz
+	rm -rf file.txt *.o *~ *.gch *.swp *.dSYM server client *.tar.gz
 
 tarball: clean
 	tar -cvf $(USERID).tar.gz *
