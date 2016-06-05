@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     srand(time(NULL)); // seed 
     oBuffer.setInitSeq(rand() % MAXSEQNO);
 
-    cerr << "Waiting for SYN" << endl;
+    // cerr << "Waiting for SYN" << endl;
     int ret;  // Return value from recvfrom
 
     while(1) { 
@@ -96,7 +96,7 @@ int main(int argc, char **argv) {
         switch(current_state) {
             case SYNWAIT: 
             {
-                cerr << "state SYNWAIT:" << endl; 
+                //cerr << "state SYNWAIT:" << endl; 
                 // waiting to receive SYN, send SYN-ACK 
                 // do timer later 
 
@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
                 current_state = SYNRECEIVED; 
 
                 // send SYNACK 
-                cerr << "About to respond with SYN/ACK" << endl;
+                //cerr << "About to respond with SYN/ACK" << endl;
                 // respond with SYNACK (seq. no = random, ack. no = client's seq. no + 1)
                 Packet synack_packet;
                 synack_packet.setSYN(); 
@@ -121,28 +121,28 @@ int main(int argc, char **argv) {
                 if (sendto(sockfd, oBuffer.getSeg(expected_ack_no).data(), oBuffer.getSeg(expected_ack_no).size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
                     perror("sendto(): SYNACK"); 
                 }
-                cerr << "Sent SYNACK" << endl;
+                //cerr << "Sent SYNACK" << endl;
                 break;
             }
             case SYNRECEIVED:
             {
-                cerr << "state SYNRECEIVED:" << endl; 
+                // cerr << "state SYNRECEIVED:" << endl; 
                 // need to implement timeout 
                 if (current_packet.getSeqNo() == (ack_no_to_client) && current_packet.hasACK() && current_packet.getAckNo() == expected_ack_no) {
-                    cerr << "Received ACK" << endl;
+                    //cerr << "Received ACK" << endl;
                     oBuffer.ack(current_packet.getAckNo());
                     current_state = CONNECTED;
-                    cerr << "Handshake complete" << endl; 
+                    //cerr << "Handshake complete" << endl; 
                     // continue onto CONNECTED case 
                 }
                 else {
-                    cerr << "Invalid ACK" << endl;
+                    //cerr << "Invalid ACK" << endl;
                     continue;
                 }
             }
             case CONNECTED: 
             {
-                cerr << "state CONNECTED:" << endl; 
+                //cerr << "state CONNECTED:" << endl; 
                 // send file chunks
                 while(reader.hasMore()) {
                     Packet file_chunk;
@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
                         {
                             perror("recvfrom(): Failed to Receive"); 
                         }
-                        oBuffer.toString();
+                        // oBuffer.toString();
                         //cerr << "Received ACK to data packet" << endl;
                         Segment s (buf, buf + ret);
                         Packet pkt(s); 
@@ -172,8 +172,8 @@ int main(int argc, char **argv) {
                     // output buffer not full (at least one spot open) so send another file chunk
 
                     uint16_t data_ack_no = oBuffer.insert(file_chunk);
-                    cerr << "Sending file chunk" << endl;
-                    file_chunk.toString();
+                    //cerr << "Sending file chunk" << endl;
+                    // file_chunk.toString();
                     if (sendto(sockfd, oBuffer.getSeg(data_ack_no).data(), oBuffer.getSeg(data_ack_no).size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0)
                     {
                         perror("sendto(): FILE"); 
@@ -187,21 +187,21 @@ int main(int argc, char **argv) {
             }
             case WAIT_FOR_ACKS: 
             {
-                cerr << "state WAIT_FOR_ACKS:" << endl; 
+                //cerr << "state WAIT_FOR_ACKS:" << endl; 
                 // Wait for acks to all packets in output buffer 
-                cerr << "BUFFER NOT EMPTY: " << endl;
-                oBuffer.toString();
+                //cerr << "BUFFER NOT EMPTY: " << endl;
+                // oBuffer.toString();
                 if (current_packet.hasACK()) {
                     oBuffer.ack(current_packet.getAckNo());
                 }
                 else {
-                    cerr << "Invalid ACK" << endl;
+                    //cerr << "Invalid ACK" << endl;
                 }
 
                 // if empty move on to close state 
                 if (oBuffer.isEmpty()) { 
                     current_state = CLOSE; 
-                    cerr << "Entering teardown" << endl; 
+                    //cerr << "Entering teardown" << endl; 
                     // send FIN
                     Packet fin_packet;
                     fin_packet.setFIN();
@@ -214,27 +214,11 @@ int main(int argc, char **argv) {
             }
             case CLOSE: 
             {
-                cerr << "state CLOSE:" << endl; 
+                //cerr << "state CLOSE:" << endl; 
                 // close connection
                 if(current_packet.hasACK() && current_packet.getAckNo() == fin_ack_no) {
                     oBuffer.ack(fin_ack_no);
                     current_state = FINWAIT; 
-                        if (current_packet.hasFIN()) {
-                            Packet finalAck;
-                            finalAck.setAckNo(ack_no_to_client);
-                            finalAck.setACK();
-                            uint16_t finalAckSeqNo = oBuffer.insert(finalAck);
-                            if (sendto(sockfd, oBuffer.getSeg(finalAckSeqNo).data(), oBuffer.getSeg(finalAckSeqNo).size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
-                                perror("sendto(): final ACK"); 
-                            }
-                            close(sockfd);
-                            return 0;
-                        }
-                        else {
-                            perror("Invalid FIN");
-                            memset(buf,'\0', BUFSIZE);
-                            continue;
-                        } 
                 }
                 else {
                     perror("Invalid teardown ACK");
@@ -244,7 +228,7 @@ int main(int argc, char **argv) {
             }
             case FINWAIT:
             {
-                cerr << "state FINWAIT:" << endl; 
+                //cerr << "state FINWAIT:" << endl; 
                 // wait for FIN
                 if (current_packet.hasFIN()) { 
                     Packet final_ack_packet; 

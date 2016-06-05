@@ -69,7 +69,7 @@ int main(int argc, char **argv)
 		exit(1); 
 	}
 
-	// seed 
+	// seed (for random sequence number) 
 	srand(time(NULL));
 	ReceivingBuffer rcvbuf;
 	rcvbuf.setSeqNo(rand() % MAXSEQNO);
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 	   	perror("sendto()"); 
 	}
 
-	// Enter finite state machine loop 
+	/****************Enter finite state machine ***********/ 
 	while(1) {
 		if (current_state == CLOSE) {
 			// WAIT FOR SOMETIME
