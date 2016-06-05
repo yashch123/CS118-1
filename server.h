@@ -10,6 +10,11 @@
 
 #include "packet.h"
 
+enum state {
+    SLOWSTART,
+    AVOIDANCE,
+    FASTRET
+};
 
 class OutputBuffer {
 public:
@@ -27,6 +32,7 @@ private:
 	uint16_t m_currentWinSize;	//current number of bytes in the network
 	uint16_t m_maxWinSize;	//maximum number of bytes allowed in the current congestion window
 	std::unordered_map<uint16_t, Segment> m_map;	//its a map its a map its a map its a map
+	state m_state;
 };
 
 class FileReader {
@@ -43,13 +49,34 @@ void OutputBuffer::setInitSeq(uint16_t seqNo) {
 	m_seqNo = seqNo;
 	m_currentWinSize = 0;
 	m_maxWinSize = 1024;
+	m_state = SLOWSTART;
 }
 
 void OutputBuffer::ack(uint16_t ackNo) {
-	std::cerr << "Removing from buffer: " << ackNo << std::endl;
+	//std::cerr << "Removing from buffer: " << ackNo << std::endl;
+	std::cout << "Receiving ACK packet " << ackNo << std::endl;
 	if(m_map.find(ackNo) != m_map.end()) {
 		m_currentWinSize -= (m_map[ackNo].size() - 8);
 		m_map.erase(ackNo);
+	}
+	switch(m_state) {
+		case SLOWSTART:
+			m_maxWinSize *= 2;
+			if(m_maxWinSize > SSTHRESH) {
+				m_state = AVOIDANCE;
+			}
+			break;
+		case AVOIDANCE:
+			m_maxWinSize += MAXPAYLOAD;
+			break;
+		case FASTRET:
+			std::cerr << "Not implemented yet" << std::endl;
+			break;
+		default:
+			std::cerr << "Error: invalid state" << std::endl;
+	}
+	if(m_maxWinSize > MAXSEQNO/2) {
+		m_maxWinSize = MAXSEQNO/2;
 	}
 }
 
@@ -63,18 +90,28 @@ bool OutputBuffer::hasSpace(uint16_t size) {
 
 uint16_t OutputBuffer::insert(Packet p) {
 	//main loop must call hasSpace before to avoid congestion
+	p.setSeqNo(nextSegSeq());
+	p.setRcvWin(m_maxWinSize);
+
 	int ackNo;
 	if(p.hasSYN() || p.hasFIN()) {
 		ackNo = (nextSegSeq() + 1) % MAXSEQNO;
+		m_seqNo = (m_seqNo + 1) % MAXSEQNO;
 	}
 	else {
-		ackNo = (nextSegSeq() + p.getData().size() + 1) % MAXSEQNO;
+		ackNo = (nextSegSeq() + p.getData().size()) % MAXSEQNO;
+		//if p is a normal data packet, print message
+		if(!p.hasACK()) {
+			std::cout << "Sending data packet " << nextSegSeq() << " " << m_maxWinSize << " " << SSTHRESH;
+			//retransmission?
+			std::cout << std::endl;
+		}
+		m_seqNo = (m_seqNo + p.getData().size()) % MAXSEQNO;
 	}
-	std::cerr << "Adding to buffer: " << ackNo << std::endl;
-	p.setSeqNo(nextSegSeq());
+	//std::cerr << "Adding to buffer: " << ackNo << std::endl;
+
 	Segment s = p.encode();
 	m_map[ackNo] = s;
-	m_seqNo = (m_seqNo + p.getData().size()) % MAXSEQNO;
 	m_currentWinSize += (p.getData().size());
 	return ackNo;
 }

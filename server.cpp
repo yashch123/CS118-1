@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
     srand(time(NULL));
     oBuffer.setInitSeq(rand() % MAXSEQNO);
 
-    cerr << "Waiting for SYN" << endl;
+    //cerr << "Waiting for SYN" << endl;
     int ret;
     while(true) {
         // wait for SYN
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
         {
             perror("recvfrom(): SYN"); 
         }
-        cerr << "Server received packet (SYN)" << endl;
+        //cerr << "Server received packet (SYN)" << endl;
         Segment s(buf, buf + ret);
         Packet pkt(s);
         //pkt.toString();
@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
     }
 
     // set up connection buffers & variables here 
-    cerr << "About to respond with SYN/ACK" << endl;
+    //cerr << "About to respond with SYN/ACK" << endl;
     // respond with SYNACK (seq. no = random, ack. no = client's seq. no + 1)
     Packet synack;
     synack.setSYN(); 
@@ -99,13 +99,13 @@ int main(int argc, char **argv) {
                 perror("sendto(): SYNACK"); 
             }
             memset(buf,'\0', BUFSIZE);
-            cerr << "Sent SYNACK" << endl;
+            //cerr << "Sent SYNACK" << endl;
             ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
             if (ret < 0)
             {
                 perror("recvfrom(): start of connection"); 
             }
-            cerr << "Received ACK" << endl;
+            //cerr << "Received ACK" << endl;
             Segment s (buf, buf + ret);
             Packet pkt(s); 
             //pkt.toString();
@@ -114,16 +114,15 @@ int main(int argc, char **argv) {
                 break; 
             }
             else {
-                cerr << "Invalid ACK" << endl;
+                perror("Invalid ACK");
             }
         }
         else {
-            cerr << "No space" << endl;
+            perror("No space");
         }
     }
-    
-        // else continue    
-    cerr << "Handshake complete" << endl;
+   
+    //cerr << "Handshake complete" << endl;
 
 
     FileReader reader(argv[2]);
@@ -131,32 +130,32 @@ int main(int argc, char **argv) {
         Packet response;
         response.setData(reader.top());
         reader.pop(); 
-        oBuffer.toString();
-        cerr << "Requested size: " << response.getData().size() << endl;
+        //oBuffer.toString();
+        //cerr << "Requested size: " << response.getData().size() << endl;
         while(!oBuffer.hasSpace(response.getData().size())) {
             //if buffer has no space, wait for ack to clear up space
-            cerr << "Test" << endl;
+            //cerr << "Test" << endl;
             ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
             if (ret < 0)
             {
                 perror("recvfrom(): Failed to Receive"); 
             }
-            cerr << "Received ACK to data packet" << endl;
+            //cerr << "Received ACK to data packet" << endl;
             Segment s (buf, buf + ret);
             Packet pkt(s); 
-            pkt.toString();
+            //pkt.toString();
             if (pkt.hasACK()) {
                 oBuffer.ack(pkt.getAckNo());
                 break; 
             }
             else {
-                cerr << "Invalid ACK" << endl;
+                perror("Invalid ACK");
             }
         }
 
         uint16_t dataSeqNo = oBuffer.insert(response);
-        cerr << "Sending file chunk" << endl;
-        response.toString();
+        //cerr << "Sending file chunk" << endl;
+
         if (sendto(sockfd, oBuffer.getSeg(dataSeqNo).data(), oBuffer.getSeg(dataSeqNo).size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0)
         {
             perror("sendto(): FILE"); 
@@ -165,10 +164,10 @@ int main(int argc, char **argv) {
 
     
     while (!oBuffer.isEmpty()) {
-        cerr << "BUFFER NOT EMPTY: " << endl;
+        //cerr << "BUFFER NOT EMPTY: " << endl;
         //oBuffer.toString();
         ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
-        cerr << "Received ACK to data packet" << endl;
+        //cerr << "Received ACK to data packet" << endl;
         Segment s (buf, buf + ret);
         Packet pkt(s); 
         //pkt.toString();
@@ -176,38 +175,12 @@ int main(int argc, char **argv) {
             oBuffer.ack(pkt.getAckNo());
         }
         else {
-            cerr << "Invalid ACK" << endl;
+            perror("Invalid ACK");
         }
     }
     
-    cerr << "Entering teardown" << endl;
-    //oBuffer.toString();
+    //cerr << "Entering teardown" << endl;
 
-
-    // int fd = open(argv[2], O_RDONLY);
-    // memset(buf,'\0', BUFSIZE);
-    // while ( (ret = read(fd, buf, BUFSIZE)) > 0) {
-    //     cerr << "ret: " << ret << endl;
-    //     Packet response;
-    //     Data payload(buf, buf + ret);
-    //     response.setData(payload);
-    //     // seed later 
-    //     response.setSeqNo(serv_seqno);
-    //     Segment file = response.encode();
-    //     cerr << "Sending file chunk" << endl;
-    //     response.toString();
-    //     if (sendto(sockfd, file.data(), file.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0)
-    //     {
-    //         perror("sendto(): FILE"); 
-    //     }
-    //     serv_seqno += ret;
-    //     memset(buf,'\0', BUFSIZE);
-    //close(fd);
-    // TODO: Start file transfer
-    // 1) Separate into segments of max size 1024 bytes (8192 bits) 
-    // 2) Start sending 
-    // 3) Keep in mind congestion window size & unacknowledged packets 
-    // 4) Resend packets if needed 
 
     //TCP teardown
     //send FIN
@@ -225,7 +198,7 @@ int main(int argc, char **argv) {
             memset(buf,'\0', BUFSIZE);
             continue;
         }
-        cerr << "Server received packet (teardown ACK)" << endl;
+        //cerr << "Server received packet (teardown ACK)" << endl;
         Segment s(buf, buf + ret);
         Packet pkt(s);
         //pkt.toString();
@@ -238,7 +211,7 @@ int main(int argc, char **argv) {
                 if (ret < 0) {
                     perror("recvfrom(): final FIN"); 
                 }
-                cerr << "Server received packet (teardown FIN)" << endl;
+                //cerr << "Server received packet (teardown FIN)" << endl;
                 Segment segF(buf, buf + ret);
                 Packet pF(segF);
                 //pF.toString();

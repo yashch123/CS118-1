@@ -6,6 +6,8 @@
 #include <iostream>
 
 #define MAXSEQNO 30720 // moved here b/c both client & server both need this
+#define SSTHRESH 30720
+#define MAXWINDOW 15360
 #define MAXPAYLOAD 1024
 #define BUFSIZE 1032
 #define FIN 0x1
@@ -199,11 +201,11 @@ void Packet::toString() {
 	if(hasFIN())
 		std::cerr << "F";
 	std::cerr << std::endl;
-	std::cerr << "Payload size: " << m_data.size() << std::endl;
+	/*std::cerr << "Payload size: " << m_data.size() << std::endl;
 	for(Data::iterator i = m_data.begin(); i != m_data.end(); i++) {
 		std::cerr << *i;
 	}
-	std::cerr << std::endl;
+	std::cerr << std::endl;*/
 }
 
 #endif // PACKET_H

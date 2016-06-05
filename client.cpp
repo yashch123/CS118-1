@@ -165,7 +165,7 @@ int main(int argc, char **argv)
 				}
 				// If the packet is in the window
 				rcvbuf.insert(current_packet);
-	    		ackNo = (current_packet.getSeqNo() + current_packet.getData().size() + 1) % MAXSEQNO;
+	    		ackNo = (current_packet.getSeqNo() + current_packet.getData().size()) % MAXSEQNO;
 				// store packet in receive buffer 
 				break;
 			default:
@@ -193,101 +193,6 @@ int main(int argc, char **argv)
 		copy((*i).data.begin(), (*i).data.end(), oi);
 	}
 
-
-	// I (Connor) have only gone to here in client, still need to check all the other stuff below (change types and structure etc)
-	// Cool story bro - Anderson 
-
-	// Restructuring: 
-	// buffer now deals with bytes, NOT shorts 
-	// One single while loop to handle packets 
-	// Segment is encoded packet 
-	// packet is classful segment 
-	// Data and Segment both vector of uint8_t 
-	// Should we use a queue instead of a vec?
-	// TODO: 
-	// 1) Restructure
-	// 2) Integrate Receive Buffer into packet 
-	// 3) Congestion, flow control, retransmissions, timeout, select 
-
-	/******************* Old code *****************************
-
-	// TODO: Set up TCP connection 
-	// 1) SYN w/ random sequence no. 
-	// 2) wait for SYN ACK (w/ server's random sequence no. & ack no. = client's + 1)
-	// 3) SYN = 0, sequence no. = client's + 1, ack no. = server's + 1, payload possible
-
-	
-	while(true) {
-		//SYN
-		Packet syn;
-		syn.setSYN();
-		syn.setSeqNo(clientSeqNo);
-		Segment synVec = syn.encode();
-		for(auto p = synVec.begin(); p != synVec.end(); p++)
-            cerr << *p << endl;
-	   	if (sendto(sockfd, synVec.data(), sizeof(synVec), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
-	   	{
-	   		perror("sendto(): SYN"); 
-	    }
-	    memset(buf,'\0', BUFSIZE);
-	    if (recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen) < 0)
-	    {
-	    	perror("recvfrom(): SYN-ACK"); 
-	    }
-	    Segment newPacket = vector(buf, buf+)
-	    Packet synResponse(buf);
-	    vector<uint16_t> v = synResponse.encode();
-	    //if valid SYN-ACK, break, otherwise loop
-	    if(synResponse.hasSYN() && synResponse.hasACK() && synResponse.getAckNo() == clientSeqNo + 1) {
-	    	ackToServer = synResponse.getSeqNo() + 1;
-	    	clientSeqNo = (clientSeqNo + 1) % MAXSEQNUM;
-	    	break;
-	    }
-	    else {
-	    	perror("SYN-ACK invalid");
-	    }
-	}
-	while(true) {
-		//ACK
-		Packet ack;
-		ack.setSeqNo(clientSeqNo);
-		ack.setACK();
-		ack.setAckNo(ackToServer);
-		vector<uint16_t> ackVec = ack.encode();
-		cout << "Sending ACK Packet " << ackToServer << endl;
-		if (sendto(sockfd, ackVec.data(), sizeof(ackVec), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
-	   	{
-	   		perror("sendto(): ACK"); 
-	    }
-	    memset(buf,'\0', BUFSIZE);
-	    int ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen);
-	    cerr << "ret = " << ret << endl;
-	    if (ret < 0)
-	    {
-	    	perror("recvfrom()"); 
-	    	break;
-	    }
-	    if (ret == 0)
-	    	break;
-	    cerr << "Printing out buffer AKA file" << endl;
-        Segment payload(buf + 4, buf + 4 + ret);
-        for (auto p = buf + 4; p != buf + 4 + ret; p++) {
-            cerr << (char) *p;
-            cerr << (char) ((*p) >> 8);
-        }
-        cerr << "START" << endl;
-	    Packet ackResponse(buf);
-	    for (auto p = ackResponse.getSegment().begin(); p != ackResponse.getSegment().end(); p++)
-		    cerr << (char*) *p;
-		cerr << endl;
-		cerr << "END" << endl;
-	    cout << "Receiving data packet " << ackResponse.getSeqNo() << endl;
-	   	ofstream outfile("file.txt", std::ios::out | std::ios::binary );
-		ostream_iterator<uint16_t> oi(outfile, ""); 
-		copy(ackResponse.getSegment().begin(), ackResponse.getSegment().end(), oi);
-	}
-
-	***************************** Old Code **********************/ 
     close(sockfd);
     return 0;
 }
