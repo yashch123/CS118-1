@@ -46,6 +46,7 @@ void OutputBuffer::setInitSeq(uint16_t seqNo) {
 }
 
 void OutputBuffer::ack(uint16_t ackNo) {
+	std::cerr << "Removing from buffer: " << ackNo << std::endl;
 	if(m_map.find(ackNo) != m_map.end()) {
 		m_currentWinSize -= (m_map[ackNo].size() - 8);
 		m_map.erase(ackNo);
@@ -57,7 +58,7 @@ void OutputBuffer::timeout() {
 }
 
 bool OutputBuffer::hasSpace(uint16_t size) {
-	return ((m_maxWinSize - m_currentWinSize) <= size);
+	return ((m_maxWinSize - m_currentWinSize) >= size);
 }
 
 uint16_t OutputBuffer::insert(Packet p) {
@@ -69,6 +70,7 @@ uint16_t OutputBuffer::insert(Packet p) {
 	else {
 		ackNo = (nextSegSeq() + p.getData().size() + 1) % MAXSEQNO;
 	}
+	std::cerr << "Adding to buffer: " << ackNo << std::endl;
 	p.setSeqNo(nextSegSeq());
 	Segment s = p.encode();
 	m_map[ackNo] = s;
@@ -90,11 +92,13 @@ bool OutputBuffer::isEmpty() {
 }
 
 void OutputBuffer::toString() {
+	std::cerr << "Max window size: " << m_maxWinSize << "\t" << "Current window size: " << m_currentWinSize << std::endl << "Diff: " << (m_maxWinSize - m_currentWinSize) << std::endl;
 	std::cerr << "Buffer contents: " << std::endl;
 	std::cerr << "Size: " << m_map.size() << std::endl;
 	for(std::unordered_map<uint16_t, Segment>::iterator i = m_map.begin(); i != m_map.end(); i++) {
 		std::cerr << i->first << "\t" <<  std::endl;
 	}
+	std::cerr << std::endl;
 }
 
 FileReader::FileReader(std::string filename) {

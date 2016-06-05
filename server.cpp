@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
         cerr << "Server received packet (SYN)" << endl;
         Segment s(buf, buf + ret);
         Packet pkt(s);
-        pkt.toString();
+        //pkt.toString();
         //if valid SYN, break and respond to client 
         if (pkt.hasSYN()) {
             ack_to_client = pkt.getSeqNo() + 1; 
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
             cerr << "Received ACK" << endl;
             Segment s (buf, buf + ret);
             Packet pkt(s); 
-            pkt.toString();
+            //pkt.toString();
             if (pkt.getSeqNo() == (ack_to_client) && pkt.hasACK() && pkt.getAckNo() == s1) {
                 oBuffer.ack(pkt.getAckNo());
                 break; 
@@ -131,10 +131,16 @@ int main(int argc, char **argv) {
         Packet response;
         response.setData(reader.top());
         reader.pop(); 
-
+        oBuffer.toString();
+        cerr << "Requested size: " << response.getData().size() << endl;
         while(!oBuffer.hasSpace(response.getData().size())) {
             //if buffer has no space, wait for ack to clear up space
+            cerr << "Test" << endl;
             ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
+            if (ret < 0)
+            {
+                perror("recvfrom(): Failed to Receive"); 
+            }
             cerr << "Received ACK to data packet" << endl;
             Segment s (buf, buf + ret);
             Packet pkt(s); 
@@ -160,12 +166,12 @@ int main(int argc, char **argv) {
     
     while (!oBuffer.isEmpty()) {
         cerr << "BUFFER NOT EMPTY: " << endl;
-        oBuffer.toString();
+        //oBuffer.toString();
         ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
         cerr << "Received ACK to data packet" << endl;
         Segment s (buf, buf + ret);
         Packet pkt(s); 
-        pkt.toString();
+        //pkt.toString();
         if (pkt.hasACK()) {
             oBuffer.ack(pkt.getAckNo());
         }
@@ -175,7 +181,7 @@ int main(int argc, char **argv) {
     }
     
     cerr << "Entering teardown" << endl;
-    oBuffer.toString();
+    //oBuffer.toString();
 
 
     // int fd = open(argv[2], O_RDONLY);
@@ -222,7 +228,7 @@ int main(int argc, char **argv) {
         cerr << "Server received packet (teardown ACK)" << endl;
         Segment s(buf, buf + ret);
         Packet pkt(s);
-        pkt.toString();
+        //pkt.toString();
         if(pkt.hasACK() && pkt.getAckNo() == finAckNo) {
             oBuffer.ack(finAckNo);
             //wait for FIN
@@ -235,7 +241,7 @@ int main(int argc, char **argv) {
                 cerr << "Server received packet (teardown FIN)" << endl;
                 Segment segF(buf, buf + ret);
                 Packet pF(segF);
-                pF.toString();
+                //pF.toString();
                 if(pF.hasFIN()) {
                     Packet finalAck;
                     finalAck.setAckNo(ack_to_client);

@@ -142,6 +142,7 @@ int main(int argc, char **argv)
 		current_packet.toString();
 		switch(current_state) { 
 			case SYNWAIT:
+				cerr << "state: SYNWAIT" << endl;
 				// check for ACK 
 				// if not correct, send again
 				if(current_packet.hasSYN() && current_packet.hasACK() && current_packet.getAckNo() == rcvbuf.getSeqNo() + 1) {
@@ -155,6 +156,7 @@ int main(int argc, char **argv)
 	    		break; 
 
 			case CONNECTED:
+				cerr << "state: CONNECTED" << endl;
 				// CHECK CASE WHERE ACK GETS LOST?????????
 				if (current_packet.hasFIN()) {
 					current_state = CLOSE;
@@ -163,7 +165,7 @@ int main(int argc, char **argv)
 				}
 				// If the packet is in the window
 				rcvbuf.insert(current_packet);
-	    		ackNo = current_packet.getSeqNo() + current_packet.getData().size() + 1; 	    		
+	    		ackNo = (current_packet.getSeqNo() + current_packet.getData().size() + 1) % MAXSEQNO;
 				// store packet in receive buffer 
 				break;
 			default:
@@ -180,6 +182,7 @@ int main(int argc, char **argv)
 	   	{
 	   		perror("sendto(): ACK"); 
 	    }
+
 	}
 
 	rcvbuf.sortBuffer();
