@@ -103,6 +103,7 @@ int main(int argc, char **argv) {
             perror("select");
             return 4;
         }
+        //every 5 ms, poll buffer
         if (nReadyFds == 0) {
             vector<Segment> timedout = oBuffer.poll();
             for(vector<Segment>::iterator i = timedout.begin(); i != timedout.end(); i++) {
@@ -110,6 +111,7 @@ int main(int argc, char **argv) {
                     perror("sendto(): FILE"); 
                 }
             }
+            continue;
         }
 
 
@@ -277,6 +279,12 @@ int main(int argc, char **argv) {
                     continue;
                 }
                 break;
+            }
+        }
+        vector<Segment> timedout = oBuffer.poll();
+        for(vector<Segment>::iterator i = timedout.begin(); i != timedout.end(); i++) {
+            if (sendto(sockfd, i->data(), i->size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
+                perror("sendto(): FILE"); 
             }
         }
         if (ready_to_close)
