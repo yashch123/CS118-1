@@ -1,13 +1,14 @@
-#include <thread>
-#include <time.h>
 #include <stdio.h> 
 #include <iostream>
 #include <string.h>     // memset, memcpy 
 #include <sys/socket.h> // socket API 
 #include <netinet/in.h> // sockaddr_in
-#include <unistd.h>     // close()
 #include <netdb.h>      // gethostbyname
-#include <stdlib.h>     // atoi, rand 
+#include <stdlib.h>     // atoi, rand
+#include <sys/select.h> //select
+#include <sys/time.h>   //timevals for select
+#include <sys/types.h>
+#include <unistd.h>     // close()
 
 #include "server.h"
 
@@ -82,7 +83,34 @@ int main(int argc, char **argv) {
     // cerr << "Waiting for SYN" << endl;
     int ret;  // Return value from recvfrom
 
-    while(1) { 
+    fd_set readFds;
+    fd_set errFds;
+    fd_set watchFds;
+    FD_ZERO(&readFds);
+    FD_ZERO(&errFds);
+    FD_ZERO(&watchFds);
+
+    FD_SET(sockfd, &watchFds);
+    struct timeval tv;
+
+    while(1) {
+        int nReadyFds = 0;
+        readFds = watchFds;
+        errFds = watchFds;
+        tv.tv_sec = 0;
+        tv.tv_usec = 5000;
+        if ((nReadyFds = select(sockfd + 1, &readFds, NULL, &errFds, &tv)) == -1) {
+            perror("select");
+            return 4;
+        }
+        if (nReadyFds == 0) {
+            std::cout << "no data is received for 3 seconds!" << std::endl;
+            continue;
+        }
+
+
+
+
         // Read from recvfrom 
         memset(buf,'\0', BUFSIZE);
         if ((ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen)) == -1){
