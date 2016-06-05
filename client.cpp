@@ -170,11 +170,7 @@ int main(int argc, char **argv)
 					break;
 				}
 				// If the packet is in the window
-				rcvbuf.insert(current_packet);
-				if (ackNo == current_packet.getSeqNo()) {
-					ackNo = (current_packet.getSeqNo() + current_packet.getData().size()) % MAXSEQNO;
-					for (auto )		
-				}
+				ackNo = rcvbuf.insert(current_packet);
 				// store packet in receive buffer 
 				break;
 			default:
