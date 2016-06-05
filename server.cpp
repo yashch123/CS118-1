@@ -98,14 +98,18 @@ int main(int argc, char **argv) {
         readFds = watchFds;
         errFds = watchFds;
         tv.tv_sec = 0;
-        tv.tv_usec = 5000;
+        tv.tv_usec = RTO/100;
         if ((nReadyFds = select(sockfd + 1, &readFds, NULL, &errFds, &tv)) == -1) {
             perror("select");
             return 4;
         }
         if (nReadyFds == 0) {
-            std::cout << "no data is received for 3 seconds!" << std::endl;
-            continue;
+            vector<Segment> timedout = oBuffer.poll();
+            for(vector<Segment>::iterator i = timedout.begin(); i != timedout.end(); i++) {
+                if (sendto(sockfd, i->data(), i->size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
+                    perror("sendto(): FILE"); 
+                }
+            }
         }
 
 

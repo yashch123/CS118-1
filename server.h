@@ -133,14 +133,22 @@ Segment OutputBuffer::getSeg(uint16_t seq) {
 	return m_map[seq].seg;
 }
 
-//	polls OutputBuffer to timed-out packets, resets their timers (on assumption that main loop is about to retransmit),
-//	and returns segments in a vector
+
+// 	Main loop must retransmit all Segments in returned vector from this function immediately after calling
+//	polls OutputBuffer to timed-out packets, resets their timers, prints message, and returns segments in vector
 std::vector<Segment> OutputBuffer::poll() {
+	std::vector<Segment> ret;
 	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end(); i++) {
-		clock_t begin = i->time;
-		double timeWaiting = (clock() - begin)/CLOCKS_PER_SEC;
-		if(timeWaiting > 0.5)
+		clock_t begin = i->second.time;
+		unsigned int timeWaiting = (clock() - begin)/CLOCKS_PER_SEC * 1000000;
+		if(timeWaiting > RTO) {
+			ret.push_back(i->second.seg);
+			i->second.time = clock();
+			Packet p(i->second.seg);
+			std::cout << "Sending data packet " << p.getSeqNo() << " " << m_maxWinSize << " " << SSTHRESH << " Retransmission" << std::endl;
+		}
 	}
+	return ret;
 }
 
 bool OutputBuffer::isEmpty() {

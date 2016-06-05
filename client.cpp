@@ -76,11 +76,11 @@ int main(int argc, char **argv)
 
 
 	/*-----------------Set up Timeout----------------------*/
-	fd_set readFdswatchFds;
+	fd_set readFds;
     FD_ZERO(&readFds);
     struct timeval tv;
-    tv.usec = RTO;
-    tv.sec = 0;
+    tv.tv_usec = RTO;
+    tv.tv_sec = 0;
     int syn_tries = 0, fin_tries = 0;
 
 	/*-----------------Begin TCP Handshake-----------------*/
@@ -108,10 +108,18 @@ int main(int argc, char **argv)
 	while(1) {
 		bool retransmit = false;
 		int nfds = 0; // start with no packets to be read
-		FD_SET(sockfd, &watchFds);
-
 		if (current_state == CLOSE) {
 			// WAIT FOR SOMETIME
+			if ((nfds = select(sockfd+1, &readFds, NULL, NULL, &tv)) == -1) {
+           			perror("select");
+        		}
+        	if (nfds == 0) {
+        		retransmit = true;
+        		fin_tries++;
+        		if (fin_tries == 3) {
+       				cerr << "Client could not connect" << endl;
+       			}
+       		}
 			rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);
 			Packet finPacket;
 			finPacket.setFIN();
@@ -123,7 +131,6 @@ int main(int argc, char **argv)
 				cout << " Retransmission";
 			}
 			cout << endl;
-		}
 			//finPacket.toString();
 			if (sendto(sockfd, finSend.data(), finSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
 	   			perror("sendto(): ACK"); 
@@ -183,14 +190,14 @@ int main(int argc, char **argv)
 		ack.setACK();
 		ack.setAckNo(ackNo);
 		Segment toSend = ack.encode();
-		if (state == SYNWAIT) {
+		if (current_state == SYNWAIT) {
 			cout << "Sending SYN Packet";
 			if (retransmit) {
 				cout << " Retransmission";
 			}
 			cout << endl;
 		}
-		else if (state == CONNECTED) {
+		else if (current_state == CONNECTED) {
 			cout << "Sending ACK Packet " << ackNo << endl;
 		}
 		if (sendto(sockfd, toSend.data(), toSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)

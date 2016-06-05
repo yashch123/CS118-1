@@ -49,12 +49,13 @@ uint16_t ReceivingBuffer::insert(Packet p) {
 	if (toInsert.data.size() + p.getSeqNo() > MAXSEQNO)
 		m_round++;
 	m_buffer.push_back(toInsert);
-	m_buffer.sortBuffer();
-	for (int k = 0; k < m_buffer.size() - 1; k++) {
+	sortBuffer();
+	unsigned int k = 0;
+	for (; k < m_buffer.size() - 1; k++) {
 		if (m_buffer[k].seq + m_buffer[k].data.size() != m_buffer[k+1].seq)
 			break;
 	}
-	return (m_buffer[k].seq + m_buffer.data.size()) % MAXSEQNO;
+	return (m_buffer[k].seq + m_buffer[k].data.size()) % MAXSEQNO;
 }
 
 std::vector<DataSeqPair> ReceivingBuffer::getBuffer() {
