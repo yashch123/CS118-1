@@ -81,7 +81,7 @@ int main(int argc, char **argv)
     struct timeval tv;
     tv.tv_usec = RTO;
     tv.tv_sec = 0;
-    int syn_tries = 0, fin_tries = 0;
+    int syn_tries = 0, fin_tries = -1;
 
 	/*-----------------Begin TCP Handshake-----------------*/
 	// Housekeeping 
@@ -110,20 +110,25 @@ int main(int argc, char **argv)
 		int nfds = 0; // start with no packets to be read
 		if (current_state == CLOSE) {
 			// WAIT FOR SOMETIME
-			if ((nfds = select(sockfd+1, &readFds, NULL, NULL, &tv)) == -1) {
+			if (fin_tries >= 0) {
+				if ((nfds = select(sockfd+1, &readFds, NULL, NULL, &tv)) == -1) {
            			perror("select");
         		}
-        	if (nfds == 0) {
-        		retransmit = true;
-        		fin_tries++;
-        		if (fin_tries == 3) {
-       				cerr << "Client could not connect" << endl;
+        		if (nfds == 0) {
+        			retransmit = true;
+        			fin_tries++;
+        			if (fin_tries == 3) {
+       					cerr << "Client could not connect" << endl;
+       				}
        			}
-       		}
+			}
+			
+       		cerr << "Creating FIN Packet" << endl;
 			rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);
 			Packet finPacket;
 			finPacket.setFIN();
 			finPacket.setSeqNo(rcvbuf.getSeqNo());
+			finPacket.setRcvWin(CLIENTRCVWINDOW);
 			finPacket.toString();
 			Segment finSend = finPacket.encode();
 			cout << "Sending FIN Packet";
@@ -135,6 +140,7 @@ int main(int argc, char **argv)
 			if (sendto(sockfd, finSend.data(), finSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
 	   			perror("sendto(): ACK"); 
 	   		}
+	   		fin_tries++;
 	   		break;
 		}
 		memset(buf,'\0', BUFSIZE);
@@ -189,6 +195,7 @@ int main(int argc, char **argv)
 		ack.setSeqNo(rcvbuf.getSeqNo());
 		ack.setACK();
 		ack.setAckNo(ackNo);
+		ack.setRcvWin(CLIENTRCVWINDOW);
 		Segment toSend = ack.encode();
 		if (current_state == SYNWAIT) {
 			cout << "Sending SYN Packet";
