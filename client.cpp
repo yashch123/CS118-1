@@ -2,7 +2,6 @@
 #include <thread>
 #include <iostream>
 #include <iterator>
-
 #include <stdio.h> 
 #include <string.h> 	// memset, memcpy 
 #include <sys/socket.h> // socket API
@@ -19,41 +18,22 @@
 
 using namespace std;
 
+// finite state machine variables 
 enum state {
 	SYNWAIT,
 	CONNECTED, 
 	CLOSE
 };
 
-/*******************
-struct sockaddr_in {
-	__uint8_t sin_len; 
-	sa_family_t sin_family; 
-	in_port_t sin_port; 
-	struct in_addr sin_addr; 
-	char sin_zero[8]; 
-};
-********************/
-
-void error(char *msg){
-	perror(msg); 
-	exit(1); 
-}
-
 int main(int argc, char **argv)
 {
 	// Parse command line arguments 
 	if (argc != 3) {
-		cerr << "Usage: " << argv[0] << " <SERVER-HOST-OR-IP>" << " PORT-NUMBER" << endl; 
+		cerr << "Usage: " << argv[0] << " <SERVER-HOST-OR-IP>" << " <PORT-NUMBER>" << endl; 
 		exit(1); 
 	}
 
-
-
 	/*-----------------Setting up the Client-----------------*/
-
-
-
 	// Decode hostname
 	// argv[1] = hostname/IP, argv[2] = port #
 	struct sockaddr_in servaddr;
@@ -93,12 +73,10 @@ int main(int argc, char **argv)
 	srand(time(NULL));
 	ReceivingBuffer rcvbuf;
 	rcvbuf.setSeqNo(rand() % MAXSEQNO);
-	// uint16_t serverSeqNum;
-
-    int ret;
 
 	/*-----------------Begin TCP Handshake-----------------*/
 	// Housekeeping 
+	int ret;	// keep track of bytes read from recvfrom 
 	uint8_t buf[BUFSIZE];
 	memset(buf,'\0', BUFSIZE);
 	socklen_t addrlen = sizeof(servaddr);
@@ -142,7 +120,6 @@ int main(int argc, char **argv)
 		current_packet.toString();
 		switch(current_state) { 
 			case SYNWAIT:
-				cerr << "state: SYNWAIT" << endl;
 				// check for ACK 
 				// if not correct, send again
 				if(current_packet.hasSYN() && current_packet.hasACK() && current_packet.getAckNo() == rcvbuf.getSeqNo() + 1) {
@@ -156,7 +133,6 @@ int main(int argc, char **argv)
 	    		break; 
 
 			case CONNECTED:
-				cerr << "state: CONNECTED" << endl;
 				// CHECK CASE WHERE ACK GETS LOST?????????
 				if (current_packet.hasFIN()) {
 					current_state = CLOSE;
@@ -165,13 +141,14 @@ int main(int argc, char **argv)
 				}
 				// If the packet is in the window
 				rcvbuf.insert(current_packet);
-	    		ackNo = (current_packet.getSeqNo() + current_packet.getData().size()) % MAXSEQNO;
+	    		ackNo = (current_packet.getSeqNo() + current_packet.getData().size()) % MAXSEQNO; 	    		
 				// store packet in receive buffer 
 				break;
 			default:
 				perror("How did you get here?");
 		}
 
+		// Client only acks 
 		Packet ack;
 		ack.setSeqNo(rcvbuf.getSeqNo());
 		ack.setACK();
@@ -182,9 +159,9 @@ int main(int argc, char **argv)
 	   	{
 	   		perror("sendto(): ACK"); 
 	    }
-
 	}
 
+	// Reassemble data by sorting and piecing back together 
 	rcvbuf.sortBuffer();
 	vector<DataSeqPair> fileBuf = rcvbuf.getBuffer();
 	ofstream outfile("file.txt", std::ios::out | std::ios::binary );

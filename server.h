@@ -10,7 +10,7 @@
 
 #include "packet.h"
 
-enum state {
+enum mode {
     SLOWSTART,
     AVOIDANCE,
     FASTRET
@@ -32,7 +32,7 @@ private:
 	uint16_t m_currentWinSize;	//current number of bytes in the network
 	uint16_t m_maxWinSize;	//maximum number of bytes allowed in the current congestion window
 	std::unordered_map<uint16_t, Segment> m_map;	//its a map its a map its a map its a map
-	state m_state;
+	mode m_mode;
 };
 
 class FileReader {
@@ -49,7 +49,7 @@ void OutputBuffer::setInitSeq(uint16_t seqNo) {
 	m_seqNo = seqNo;
 	m_currentWinSize = 0;
 	m_maxWinSize = 1024;
-	m_state = SLOWSTART;
+	m_mode = SLOWSTART;
 }
 
 void OutputBuffer::ack(uint16_t ackNo) {
@@ -59,11 +59,11 @@ void OutputBuffer::ack(uint16_t ackNo) {
 		m_currentWinSize -= (m_map[ackNo].size() - 8);
 		m_map.erase(ackNo);
 	}
-	switch(m_state) {
+	switch(m_mode) {
 		case SLOWSTART:
 			m_maxWinSize *= 2;
 			if(m_maxWinSize > SSTHRESH) {
-				m_state = AVOIDANCE;
+				m_mode = AVOIDANCE;
 			}
 			break;
 		case AVOIDANCE:
