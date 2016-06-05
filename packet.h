@@ -5,6 +5,8 @@
 #include <cstdint> 
 #include <iostream>
 
+#define RTO 500000 // 500000 usec is 500 msec
+#define CLIENTRCVWINDOW 30720
 #define MAXSEQNO 30720 // moved here b/c both client & server both need this
 #define SSTHRESH 30720
 #define MAXWINDOW 15360
