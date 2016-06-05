@@ -3,6 +3,7 @@
 
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>	//clock
 
 #include <string>
 #include <queue>
@@ -16,6 +17,11 @@ enum mode {
     FASTRET
 };
 
+struct timeDataPair {
+	clock_t time;
+	Segment seg;
+};
+
 class OutputBuffer {
 public:
 	void setInitSeq(uint16_t seqNo);
@@ -24,14 +30,15 @@ public:
 	bool hasSpace(uint16_t size = 1024);
 	uint16_t insert(Packet p);
 	uint16_t nextSegSeq();
-	Segment getSeg(uint16_t seq); // Not sure what this does
+	Segment getSeg(uint16_t seq);
 	bool isEmpty();
 	void toString();
+	std::vector<Segment> poll();
 private:
 	uint16_t m_seqNo;	//sequence number
 	uint16_t m_currentWinSize;	//current number of bytes in the network
 	uint16_t m_maxWinSize;	//maximum number of bytes allowed in the current congestion window
-	std::unordered_map<uint16_t, Segment> m_map;	//its a map its a map its a map its a map
+	std::unordered_map<uint16_t, timeDataPair> m_map;	//its a map its a map its a map its a map
 	mode m_mode;
 };
 
@@ -56,7 +63,7 @@ void OutputBuffer::ack(uint16_t ackNo) {
 	//std::cerr << "Removing from buffer: " << ackNo << std::endl;
 	std::cout << "Receiving ACK packet " << ackNo << std::endl;
 	if(m_map.find(ackNo) != m_map.end()) {
-		m_currentWinSize -= (m_map[ackNo].size() - 8);
+		m_currentWinSize -= (m_map[ackNo].seg.size() - 8);
 		m_map.erase(ackNo);
 	}
 	switch(m_mode) {
@@ -108,10 +115,12 @@ uint16_t OutputBuffer::insert(Packet p) {
 		}
 		m_seqNo = (m_seqNo + p.getData().size()) % MAXSEQNO;
 	}
-	//std::cerr << "Adding to buffer: " << ackNo << std::endl;
 
-	Segment s = p.encode();
-	m_map[ackNo] = s;
+	timeDataPair pair;
+	pair.time = clock();
+	pair.seg = p.encode();
+
+	m_map[ackNo] = pair;
 	m_currentWinSize += (p.getData().size());
 	return ackNo;
 }
@@ -121,7 +130,17 @@ uint16_t OutputBuffer::nextSegSeq() {
 }
 
 Segment OutputBuffer::getSeg(uint16_t seq) {
-	return m_map[seq];
+	return m_map[seq].seg;
+}
+
+//	polls OutputBuffer to timed-out packets, resets their timers (on assumption that main loop is about to retransmit),
+//	and returns segments in a vector
+std::vector<Segment> OutputBuffer::poll() {
+	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end(); i++) {
+		clock_t begin = i->time;
+		double timeWaiting = (clock() - begin)/CLOCKS_PER_SEC;
+		if(timeWaiting > 0.5)
+	}
 }
 
 bool OutputBuffer::isEmpty() {
@@ -132,7 +151,7 @@ void OutputBuffer::toString() {
 	std::cerr << "Max window size: " << m_maxWinSize << "\t" << "Current window size: " << m_currentWinSize << std::endl << "Diff: " << (m_maxWinSize - m_currentWinSize) << std::endl;
 	std::cerr << "Buffer contents: " << std::endl;
 	std::cerr << "Size: " << m_map.size() << std::endl;
-	for(std::unordered_map<uint16_t, Segment>::iterator i = m_map.begin(); i != m_map.end(); i++) {
+	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end(); i++) {
 		std::cerr << i->first << "\t" <<  std::endl;
 	}
 	std::cerr << std::endl;
