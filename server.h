@@ -63,17 +63,27 @@ void OutputBuffer::setInitSeq(uint16_t seqNo) {
 
 void OutputBuffer::ack(uint16_t ackNo) {
 	std::cout << "Receiving ACK packet " << ackNo << std::endl;
-	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end(); i++) {
-		if(ackNo <= MAXSEQNO/2) {
+	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end();) {
+		if(ackNo >= MAXSEQNO/2) {
+			std::cerr << "Range: " << (ackNo - MAXSEQNO/2) << "\t" << ackNo << std::endl;
+			std::cerr << "Testing: " << i->first << std::endl;
 			if(i->first >= (ackNo - MAXSEQNO/2) && i->first <= ackNo) {
 				m_currentWinSize -= (i->second.seg.size() - 8);
-				m_map.erase(i);
+				i = m_map.erase(i);
+			}
+			else {
+				i++;
 			}
 		}
 		else {
+			std::cerr << "Range: " << 0 << "\t" << ackNo << ",\t" << ackNo + MAXSEQNO/2 << "\t" << MAXSEQNO << std::endl;
+			std::cerr << "Testing: " << i->first << std::endl;
 			if(i->first <= ackNo || i->first >= (ackNo + MAXSEQNO/2)) {
 				m_currentWinSize -= (i->second.seg.size() - 8);
-				m_map.erase(i);
+				i = m_map.erase(i);
+			}
+			else {
+				i++;
 			}
 		}
 			
@@ -153,16 +163,25 @@ Segment OutputBuffer::getSeg(uint16_t seq) {
 //	polls OutputBuffer to timed-out packets, resets their timers, prints message, and returns segments in vector
 std::vector<Segment> OutputBuffer::poll() {
 	std::vector<Segment> ret;
+	bool anyTimeout = false;
 	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end(); i++) {
 		clock_t begin = i->second.time;
-		double timeWaiting = ((double)(clock() - begin)* 1000000 * 1000)/CLOCKS_PER_SEC;
+		double timeWaiting = ((double)(clock() - begin)* 1000000000)/CLOCKS_PER_SEC;
 		std::cerr << "Polling " << i->first << "\t" << timeWaiting << std::endl;
+		//CHANGE THIS BACK TO RTO AFTER DEBUGGING
 		if(timeWaiting > RTO) {
+			anyTimeout = true;
 			ret.push_back(i->second.seg);
 			i->second.time = clock();
 			Packet p(i->second.seg);
-			std::cout << "Sending data packet " << p.getSeqNo() << " " << m_maxWinSize << " " << m_ssthresh << " Retransmission" << std::endl;
+			if(!(p.hasSYN() || p.hasFIN()))
+				std::cout << "Sending data packet " << p.getSeqNo() << " " << m_maxWinSize << " " << m_ssthresh << " Retransmission" << std::endl;
+			else
+				std::cerr << "Resending ACK/FIN " << p.getSeqNo() << std::endl;
 		}
+	}
+	if(anyTimeout) {
+		timeout();
 	}
 	return ret;
 }
