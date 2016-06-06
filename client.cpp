@@ -81,11 +81,12 @@ int main(int argc, char **argv)
     struct timeval tv;
     tv.tv_usec = RTO;
     tv.tv_sec = 0;
-    int syn_tries = 0, fin_tries = -1;
+    int syn_tries = 0, fin_tries = 0;
 
 	/*-----------------Begin TCP Handshake-----------------*/
 	// Housekeeping 
-	int ret;	// keep track of bytes read from recvfrom 
+	int connection_done = false; 
+	int ret = 0;	// keep track of bytes read from recvfrom 
 	uint8_t buf[BUFSIZE];
 	memset(buf,'\0', BUFSIZE);
 	socklen_t addrlen = sizeof(servaddr);
@@ -98,7 +99,6 @@ int main(int argc, char **argv)
 	syn_packet.setSeqNo(rcvbuf.getSeqNo());
 	syn_packet.setRcvWin(CLIENTRCVWINDOW);
 	Segment syn_encoded = syn_packet.encode(); 
-	syn_packet.toString();
 	if (sendto(sockfd, syn_encoded.data(), syn_encoded.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
 	   	perror("sendto()"); 
 	}
@@ -106,64 +106,57 @@ int main(int argc, char **argv)
 
 	/****************Enter finite state machine ***********/ 
 	while(1) {
+		if (connection_done)
+			break; 
 		bool retransmit = false;
 		int nfds = 0; // start with no packets to be read
-		if (current_state == CLOSE) {
-			// WAIT FOR SOMETIME
-			if (fin_tries >= 0) {
-				if ((nfds = select(sockfd+1, &readFds, NULL, NULL, &tv)) == -1) {
-           			perror("select");
-        		}
-        		if (nfds == 0) {
-        			retransmit = true;
-        			fin_tries++;
-        			if (fin_tries == 3) {
-       					cerr << "Client could not connect" << endl;
-       				}
-       			}
-			}
-			
-       		cerr << "Creating FIN Packet" << endl;
-			rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);
-			Packet finPacket;
-			finPacket.setFIN();
-			finPacket.setSeqNo(rcvbuf.getSeqNo());
-			finPacket.setRcvWin(CLIENTRCVWINDOW);
-			finPacket.toString();
-			Segment finSend = finPacket.encode();
-			cout << "Sending FIN Packet";
-			if (retransmit) {
-				cout << " Retransmission";
-			}
-			cout << endl;
-			//finPacket.toString();
-			if (sendto(sockfd, finSend.data(), finSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
-	   			perror("sendto(): ACK"); 
-	   		}
-	   		fin_tries++;
-	   		break;
-		}
+		// recfrom into buffer 
 		memset(buf,'\0', BUFSIZE);
-		ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen);
-		if (ret < 0) {
-	    	perror("recvfrom()"); 
-	    }
+
+		// Select needs to be called before recvfrom for SYNWAIT & CLOSE
+		if (current_state == SYNWAIT || current_state == CLOSE){
+			if ((nfds = select(sockfd+1, &readFds, NULL, NULL, &tv)) == -1) {
+           			perror("select");
+        	}
+        	if (nfds != 0) {
+        		ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen);
+					if (ret < 0) {
+		    			perror("recvfrom()"); 
+		    		}
+		    	Segment seg(buf, buf + ret); 
+		    	Packet current_packet(seg); 
+		    }
+		}
+		else { 
+			ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen);
+			if (ret < 0) {
+		    	perror("recvfrom()"); 
+		    }
+		}
 	    Segment seg(buf, buf + ret);
 	    Packet current_packet(seg);
-		current_packet.toString();
+		// current_packet.toString();
 		switch(current_state) { 
 			case SYNWAIT:
+			{
 				// check for ACK 
 				// if not correct, send again
-				if ((nfds = select(sockfd+1, &readFds, NULL, NULL, &tv)) == -1) {
-           			perror("select");
-        		}
         		if (nfds == 0) {
         			retransmit = true;
         			syn_tries++;
         			if (syn_tries == 3) {
         				cerr << "Client could not connect" << endl;
+        				exit(1);
         			}
+        			Packet syn_packet; 
+					syn_packet.setSYN(); 
+					syn_packet.setSeqNo(rcvbuf.getSeqNo());
+					syn_packet.setRcvWin(CLIENTRCVWINDOW);
+					Segment syn_encoded = syn_packet.encode(); 
+					if (sendto(sockfd, syn_encoded.data(), syn_encoded.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
+					   	perror("sendto()"); 
+					}
+					continue;
         		}
 				if(current_packet.hasSYN() && current_packet.hasACK() && current_packet.getAckNo() == rcvbuf.getSeqNo() + 1) {
 	    			ackNo = current_packet.getSeqNo() + 1;
@@ -174,20 +167,81 @@ int main(int argc, char **argv)
 	    			perror("SYN-ACK invalid");
 	    		}
 	    		break; 
-
+	    	}
 			case CONNECTED:
+			{
 				// CHECK CASE WHERE ACK GETS LOST?????????
 				if (current_packet.hasFIN()) {
+					// move onto CLOSE state
 					current_state = CLOSE;
-					ackNo = (current_packet.getSeqNo() + 1) % MAXSEQNO; 						
+					ackNo = (current_packet.getSeqNo() + 1) % MAXSEQNO; 
+
+					// Send ACK to FIN from server 
+					Packet ack_to_fin_packet;
+					ack_to_fin_packet.setSeqNo(rcvbuf.getSeqNo());
+					ack_to_fin_packet.setACK();
+					ack_to_fin_packet.setAckNo(ackNo);
+					Segment seg = ack_to_fin_packet.encode();	
+
+					cout << "Sending ACK Packet " << ackNo << endl; 		
+
+					if (sendto(sockfd, seg.data(), seg.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
+				   	{
+				   		perror("sendto(): ACK"); 
+				    }	
+
+				    // Prep next seq. no for CLOSE state 
+				    rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);		
+				}
+				else {
+					ackNo = rcvbuf.insert(current_packet);
 					break;
 				}
-				// If the packet is in the window
-				ackNo = rcvbuf.insert(current_packet);
-				// store packet in receive buffer 
-				break;
+			}
+			case CLOSE: 
+			{
+				// WAIT FOR SOMETIME
+				if (fin_tries > 0) {
+					// select error 
+	        		// Timeout occured after RTO time
+	        		if (nfds == 0) {
+	        			retransmit = true;
+	        			fin_tries++;
+	        			if (fin_tries > 4) {
+	       					cerr << "Client could not transmit FIN, now closing" << endl;
+	       					connection_done = true; 
+	       					break; 
+	       				}
+	       			}
+	       			// There is data to read 
+	       			if (current_packet.hasACK() && current_packet.getAckNo() == rcvbuf.getSeqNo()) { 
+	       				connection_done = true; 
+	       				continue;
+	       			}
+
+				}
+				
+	       		// cerr << "Creating FIN Packet" << endl;
+				Packet finPacket;
+				finPacket.setFIN();
+				finPacket.setSeqNo(rcvbuf.getSeqNo());
+				finPacket.setRcvWin(CLIENTRCVWINDOW);
+				Segment finSend = finPacket.encode();
+				cout << "Sending FIN Packet";
+				if (retransmit) {
+					cout << " Retransmission";
+				}
+				cout << endl;
+				//finPacket.toString();
+				if (sendto(sockfd, finSend.data(), finSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
+		   			perror("sendto(): FIN"); 
+		   		}
+		   		fin_tries++;
+		   		continue; 
+		   	}
 			default:
 				perror("How did you get here?");
+
 		}
 
 		// Client only acks 
