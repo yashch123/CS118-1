@@ -62,12 +62,23 @@ void OutputBuffer::setInitSeq(uint16_t seqNo) {
 }
 
 void OutputBuffer::ack(uint16_t ackNo) {
-	//std::cerr << "Removing from buffer: " << ackNo << std::endl;
 	std::cout << "Receiving ACK packet " << ackNo << std::endl;
-	if(m_map.find(ackNo) != m_map.end()) {
-		m_currentWinSize -= (m_map[ackNo].seg.size() - 8);
-		m_map.erase(ackNo);
+	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end(); i++) {
+		if(ackNo <= MAXSEQNO/2) {
+			if(i->first >= (ackNo - MAXSEQNO/2) && i->first <= ackNo) {
+				m_currentWinSize -= (i->second.seg.size() - 8);
+				m_map.erase(i);
+			}
+		}
+		else {
+			if(i->first <= ackNo || i->first >= (ackNo + MAXSEQNO/2)) {
+				m_currentWinSize -= (i->second.seg.size() - 8);
+				m_map.erase(i);
+			}
+		}
+			
 	}
+	
 	switch(m_mode) {
 		case SLOWSTART:
 			m_maxWinSize *= 2;
@@ -92,6 +103,7 @@ void OutputBuffer::ack(uint16_t ackNo) {
 void OutputBuffer::timeout() {
 	m_ssthresh = m_maxWinSize/2;
 	m_maxWinSize = 1024;
+	m_mode = SLOWSTART;
 }
 
 bool OutputBuffer::hasSpace(uint16_t size) {
@@ -143,7 +155,8 @@ std::vector<Segment> OutputBuffer::poll() {
 	std::vector<Segment> ret;
 	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end(); i++) {
 		clock_t begin = i->second.time;
-		unsigned int timeWaiting = (clock() - begin)/CLOCKS_PER_SEC * 1000000;
+		double timeWaiting = ((double)(clock() - begin)* 1000000 * 1000)/CLOCKS_PER_SEC;
+		std::cerr << "Polling " << i->first << "\t" << timeWaiting << std::endl;
 		if(timeWaiting > RTO) {
 			ret.push_back(i->second.seg);
 			i->second.time = clock();

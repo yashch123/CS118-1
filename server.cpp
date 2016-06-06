@@ -98,13 +98,15 @@ int main(int argc, char **argv) {
         readFds = watchFds;
         errFds = watchFds;
         tv.tv_sec = 0;
-        tv.tv_usec = RTO/100;
+        //change back to RTO/100
+        tv.tv_usec = RTO;
         if ((nReadyFds = select(sockfd + 1, &readFds, NULL, &errFds, &tv)) == -1) {
             perror("select");
             return 4;
         }
         //every 5 ms, poll buffer
         if (nReadyFds == 0) {
+            cerr << "Polling" << endl;
             vector<Segment> timedout = oBuffer.poll();
             for(vector<Segment>::iterator i = timedout.begin(); i != timedout.end(); i++) {
                 if (sendto(sockfd, i->data(), i->size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
@@ -114,14 +116,14 @@ int main(int argc, char **argv) {
             continue;
         }
 
-
-
+        cerr << "Packet received, receiving" << endl;
 
         // Read from recvfrom 
         memset(buf,'\0', BUFSIZE);
         if ((ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen)) == -1){
             perror("recvfrom()"); 
         }
+       
         // oBuffer.toString();
         Segment seg(buf, buf + ret);
         Packet current_packet(seg); // current packet being examined
@@ -176,34 +178,21 @@ int main(int argc, char **argv) {
             }
             case CONNECTED: 
             {
-                //cerr << "state CONNECTED:" << endl; 
+                cerr << "Entering connected state case" << endl;
+                if(current_packet.hasACK()) {
+                    oBuffer.ack(current_packet.getAckNo());
+                }
+                
                 // send file chunks
                 while(reader.hasMore()) {
+                    cerr << "Polling reader" << endl;
+                    if(!oBuffer.hasSpace(reader.top().size())) {
+                        cerr << "Buffer out of space" << endl;
+                        break;
+                    }
                     Packet file_chunk;
                     file_chunk.setData(reader.top());
                     reader.pop(); 
-                    while(!oBuffer.hasSpace(file_chunk.getData().size())) { 
-                        //if buffer has no space, wait for ack to clear up space
-                        ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &clientaddr, &addrlen);
-                        if (ret < 0)
-                        {
-                            perror("recvfrom(): Failed to Receive"); 
-                        }
-                        // oBuffer.toString();
-                        //cerr << "Received ACK to data packet" << endl;
-                        Segment s (buf, buf + ret);
-                        Packet pkt(s); 
-                        //pkt.toString();
-                        if (pkt.hasACK()) {
-                            oBuffer.ack(pkt.getAckNo());
-                            break; 
-                        }
-                        else {
-                            perror("Invalid ACK");
-                        }
-                    }
-
-                    // output buffer not full (at least one spot open) so send another file chunk
 
                     uint16_t data_ack_no = oBuffer.insert(file_chunk);
                     //cerr << "Sending file chunk" << endl;
@@ -217,6 +206,7 @@ int main(int argc, char **argv) {
                 if(!reader.hasMore()) {
                     current_state = WAIT_FOR_ACKS; 
                 }
+                cerr << "Exiting connected state case" << endl;
                 break;
             }
             case WAIT_FOR_ACKS: 
