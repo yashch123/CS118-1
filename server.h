@@ -63,6 +63,9 @@ void OutputBuffer::setInitSeq(uint16_t seqNo) {
 
 void OutputBuffer::ack(uint16_t ackNo) {
 	std::cout << "Receiving ACK packet " << ackNo << std::endl;
+	if(m_map.find(ackNo) == m_map.end()) {
+		return;
+	}
 	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end();) {
 		if(ackNo >= MAXSEQNO/2) {
 			std::cerr << "Range: " << (ackNo - MAXSEQNO/2) << "\t" << ackNo << std::endl;

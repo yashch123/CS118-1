@@ -23,9 +23,12 @@ public:
 	uint16_t insert(Packet p);
 	std::vector<DataSeqPair> getBuffer();
 	void sortBuffer();
+	uint16_t getExpectedSeqNo(); 
+	void setExpectedSeqNo(uint16_t expectedSeqNo);
 private:
 	// Initial sequence number
 	uint16_t m_seqNo;
+	uint16_t m_expectedSeqNo; // expected sequence number from server 
 	// Buffer is a vector of packet data and sequence number pairs
 	//uint16_t m_cumSeqNo; 
 	int m_round; // keeps track of round number since sequence numbers may become non-unique 
@@ -66,5 +69,11 @@ void ReceivingBuffer::sortBuffer() {
 	std::sort(m_buffer.begin(), m_buffer.end(), compareForSort);
 }
 
+uint16_t ReceivingBuffer::getExpectedSeqNo() { 
+	return m_expectedSeqNo; 
+}
 
+void ReceivingBuffer::setExpectedSeqNo(uint16_t expectedSeqNo) { 
+	m_expectedSeqNo = expectedSeqNo; 
+}
 #endif

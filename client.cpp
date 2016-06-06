@@ -114,19 +114,13 @@ int main(int argc, char **argv)
 		memset(buf,'\0', BUFSIZE);
 
 		// Select needs to be called before recvfrom for SYNWAIT & CLOSE
-		if (current_state == SYNWAIT || current_state == CLOSE){
-			if ((nfds = select(sockfd+1, &readFds, NULL, NULL, &tv)) == -1) {
-           			perror("select");
-        	}
-        	if (nfds != 0) {
-        		ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen);
-					if (ret < 0) {
-		    			perror("recvfrom()"); 
-		    		}
-		    	Segment seg(buf, buf + ret); 
-		    	Packet current_packet(seg); 
-		    }
-		}
+		if ((nfds = select(sockfd+1, &readFds, NULL, NULL, &tv)) == -1) {
+           	perror("select");
+        }
+
+        if (nfds == 0 && (current_state == SYNWAIT || current_state == CLOSE)) {
+        	// do nothing 
+        }
 		else { 
 			ret = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *) &servaddr, &addrlen);
 			if (ret < 0) {
@@ -210,7 +204,7 @@ int main(int argc, char **argv)
 	        			if (fin_tries > 4) {
 	       					cerr << "Client could not transmit FIN, now closing" << endl;
 	       					connection_done = true; 
-	       					break; 
+	       					continue;
 	       				}
 	       			}
 	       			// There is data to read 

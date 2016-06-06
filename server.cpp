@@ -94,7 +94,8 @@ int main(int argc, char **argv) {
     struct timeval tv;
 
     while(1) {
-        
+        if (ready_to_close)
+            break; 
         /*clock_t delay = clock();
         while((clock() - delay) * 1000000000/CLOCKS_PER_SEC < 3000000000) {
             continue;
@@ -244,7 +245,7 @@ int main(int argc, char **argv) {
                     }
                 }
                 cerr << "Buffer isn't empty, return to select" << endl;
-                break; 
+               
             }
             case CLOSE: 
             {
@@ -269,7 +270,7 @@ int main(int argc, char **argv) {
                 // wait for FIN
                 if (current_packet.hasFIN()) { 
                     Packet final_ack_packet; 
-                    final_ack_packet.setAckNo(ack_no_to_client);
+                    final_ack_packet.setAckNo(ack_no_to_client + 1);
                     final_ack_packet.setACK();
                     uint16_t final_ack_seq_no = oBuffer.insert(final_ack_packet);
                     if (sendto(sockfd, oBuffer.getSeg(final_ack_seq_no).data(), oBuffer.getSeg(final_ack_seq_no).size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
@@ -291,8 +292,6 @@ int main(int argc, char **argv) {
                 perror("sendto(): FILE"); 
             }
         }
-        if (ready_to_close)
-            break; 
     }
     // wait for some time, then close 
     close(sockfd); 
