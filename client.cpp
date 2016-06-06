@@ -90,7 +90,10 @@ int main(int argc, char **argv)
 	uint8_t buf[BUFSIZE];
 	memset(buf,'\0', BUFSIZE);
 	socklen_t addrlen = sizeof(servaddr);
-	uint16_t ackNo = 0;
+	/********************************************
+	Got rid of ackno 
+	********************************************/
+	// uint16_t ackNo = 0;
 
 	// Create syn 
 	state current_state = SYNWAIT; 
@@ -153,7 +156,7 @@ int main(int argc, char **argv)
 					continue;
         		}
 				if(current_packet.hasSYN() && current_packet.hasACK() && current_packet.getAckNo() == rcvbuf.getSeqNo() + 1) {
-	    			ackNo = current_packet.getSeqNo() + 1;
+					rcvbuf.setExpectedSeqNo((current_packet.getSeqNo() + 1) % MAXSEQNO);
 	    			rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);
 	    			current_state = CONNECTED;
 	    		}
@@ -168,16 +171,16 @@ int main(int argc, char **argv)
 				if (current_packet.hasFIN()) {
 					// move onto CLOSE state
 					current_state = CLOSE;
-					ackNo = (current_packet.getSeqNo() + 1) % MAXSEQNO; 
+					rcvbuf.setExpectedSeqNo((current_packet.getSeqNo() + 1) % MAXSEQNO);
 
 					// Send ACK to FIN from server 
 					Packet ack_to_fin_packet;
 					ack_to_fin_packet.setSeqNo(rcvbuf.getSeqNo());
 					ack_to_fin_packet.setACK();
-					ack_to_fin_packet.setAckNo(ackNo);
+					ack_to_fin_packet.setAckNo(rcvbuf.getExpectedSeqNo());
 					Segment seg = ack_to_fin_packet.encode();	
 
-					cout << "Sending ACK Packet " << ackNo << endl; 		
+					cout << "Sending ACK Packet " << rcvbuf.getExpectedSeqNo() << endl; 		
 
 					if (sendto(sockfd, seg.data(), seg.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
 				   	{
@@ -188,7 +191,7 @@ int main(int argc, char **argv)
 				    rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);		
 				}
 				else {
-					ackNo = rcvbuf.insert(current_packet);
+					rcvbuf.insert(current_packet);
 					break;
 				}
 			}
@@ -242,7 +245,7 @@ int main(int argc, char **argv)
 		Packet ack;
 		ack.setSeqNo(rcvbuf.getSeqNo());
 		ack.setACK();
-		ack.setAckNo(ackNo);
+		ack.setAckNo(rcvbuf.getExpectedSeqNo());
 		ack.setRcvWin(CLIENTRCVWINDOW);
 		Segment toSend = ack.encode();
 		if (current_state == SYNWAIT) {
@@ -253,7 +256,7 @@ int main(int argc, char **argv)
 			cout << endl;
 		}
 		else if (current_state == CONNECTED) {
-			cout << "Sending ACK Packet " << ackNo << endl;
+			cout << "Sending ACK Packet " << rcvbuf.getExpectedSeqNo() << endl;
 		}
 		if (sendto(sockfd, toSend.data(), toSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
 	   	{
