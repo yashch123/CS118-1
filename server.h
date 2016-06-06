@@ -40,6 +40,7 @@ private:
 	uint16_t m_maxWinSize;	//maximum number of bytes allowed in the current congestion window
 	std::unordered_map<uint16_t, timeDataPair> m_map;	//its a map its a map its a map its a map
 	mode m_mode;
+	uint16_t m_ssthresh;
 };
 
 class FileReader {
@@ -57,6 +58,7 @@ void OutputBuffer::setInitSeq(uint16_t seqNo) {
 	m_currentWinSize = 0;
 	m_maxWinSize = 1024;
 	m_mode = SLOWSTART;
+	m_ssthresh = 30720;
 }
 
 void OutputBuffer::ack(uint16_t ackNo) {
@@ -69,7 +71,7 @@ void OutputBuffer::ack(uint16_t ackNo) {
 	switch(m_mode) {
 		case SLOWSTART:
 			m_maxWinSize *= 2;
-			if(m_maxWinSize > SSTHRESH) {
+			if(m_maxWinSize > m_ssthresh) {
 				m_mode = AVOIDANCE;
 			}
 			break;
@@ -88,7 +90,8 @@ void OutputBuffer::ack(uint16_t ackNo) {
 }
 
 void OutputBuffer::timeout() {
-	//resets window variables
+	m_ssthresh = m_maxWinSize/2;
+	m_maxWinSize = 1024;
 }
 
 bool OutputBuffer::hasSpace(uint16_t size) {
@@ -109,7 +112,7 @@ uint16_t OutputBuffer::insert(Packet p) {
 		ackNo = (nextSegSeq() + p.getData().size()) % MAXSEQNO;
 		//if p is a normal data packet, print message
 		if(!p.hasACK()) {
-			std::cout << "Sending data packet " << nextSegSeq() << " " << m_maxWinSize << " " << SSTHRESH;
+			std::cout << "Sending data packet " << nextSegSeq() << " " << m_maxWinSize << " " << m_ssthresh;
 			//retransmission?
 			std::cout << std::endl;
 		}
@@ -145,7 +148,7 @@ std::vector<Segment> OutputBuffer::poll() {
 			ret.push_back(i->second.seg);
 			i->second.time = clock();
 			Packet p(i->second.seg);
-			std::cout << "Sending data packet " << p.getSeqNo() << " " << m_maxWinSize << " " << SSTHRESH << " Retransmission" << std::endl;
+			std::cout << "Sending data packet " << p.getSeqNo() << " " << m_maxWinSize << " " << m_ssthresh << " Retransmission" << std::endl;
 		}
 	}
 	return ret;
