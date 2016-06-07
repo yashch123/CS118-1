@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
     memset(buf,'\0', BUFSIZE);
     OutputBuffer oBuffer;     // store packets to be sent 
     FileReader reader(argv[2]);
-    srand(time(NULL)); // seed 
+    //srand(time(NULL)); // seed 
     oBuffer.setInitSeq(rand() % MAXSEQNO);
 
     // cerr << "Waiting for SYN" << endl;
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
     struct timeval tv;
 
     while(1) {
-        if (ready_to_close || oBuffer.getFinTries() > 3)
+        if (ready_to_close || oBuffer.getFinTries() >= 3 || oBuffer.getSynTries() >= 3)
             break; 
         /*clock_t delay = clock();
         while((clock() - delay) * 1000000000/CLOCKS_PER_SEC < 3000000000) {
@@ -173,7 +173,7 @@ int main(int argc, char **argv) {
                 // need to implement timeout 
                 if (current_packet.getSeqNo() == (ack_no_to_client) && current_packet.hasACK() && current_packet.getAckNo() == expected_ack_no) {
                     //cerr << "ACKing in SYNRECEIVED" << endl;
-                    oBuffer.ack(current_packet.getAckNo());
+                    oBuffer.ack(current_packet.getAckNo(), true);
                     current_state = CONNECTED;
                     //cerr << "Handshake complete" << endl; 
                     // continue onto CONNECTED case 
@@ -253,10 +253,17 @@ int main(int argc, char **argv) {
                 // close connection
                 //cerr << current_packet.getAckNo() << endl;
                 if(current_packet.hasACK() && current_packet.getAckNo() == fin_ack_no) {
-                    oBuffer.ack(fin_ack_no);
+                    oBuffer.ack(fin_ack_no, true);
                     current_state = FINWAIT; 
                 }
                 else {
+                    Packet fin_packet;
+                    fin_packet.setFIN();
+                    fin_ack_no = oBuffer.insert(fin_packet);
+                    //cerr << "Sending FIN" << endl;
+                    if (sendto(sockfd, oBuffer.getSeg(fin_ack_no).data(), oBuffer.getSeg(fin_ack_no).size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
+                        perror("sendto(): FIN");
+                    }
                     //perror("Invalid teardown ACK");
                     //current_packet.toString();
                     continue;

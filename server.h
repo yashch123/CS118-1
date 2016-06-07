@@ -28,7 +28,7 @@ struct timeDataPair {
 class OutputBuffer {
 public:
 	void setInitSeq(uint16_t seqNo);
-	void ack(uint16_t ackNo);
+	void ack(uint16_t ackNo, bool ackOrFin = false);
 	void timeout();
 	bool hasSpace(uint16_t size = 1024);
 	uint16_t insert(Packet p);
@@ -37,8 +37,8 @@ public:
 	bool isEmpty();
 	void toString();
 	std::vector<Segment> poll();
-	int getFinTries();
 	int getSynTries();
+	int getFinTries();
 private:
 	int m_finTries;
 	int m_synTries;
@@ -67,10 +67,10 @@ void OutputBuffer::setInitSeq(uint16_t seqNo) {
 	m_currentWinSize = 0;
 	m_maxWinSize = 1024;
 	m_mode = SLOWSTART;
-	m_ssthresh = 30720;
+	m_ssthresh = 15360;
 }
 
-void OutputBuffer::ack(uint16_t ackNo) {
+void OutputBuffer::ack(uint16_t ackNo, bool ackOrFin) {
 	std::cout << "Receiving packet " << ackNo << std::endl;
 	if(m_map.find(ackNo) == m_map.end()) {
 		return;
@@ -100,16 +100,19 @@ void OutputBuffer::ack(uint16_t ackNo) {
 		}
 			
 	}
-	
+
+	if (ackOrFin)
+		return;
+
 	switch(m_mode) {
 		case SLOWSTART:
-			m_maxWinSize *= 2;
+			m_maxWinSize += MAXPAYLOAD;
 			if(m_maxWinSize > m_ssthresh) {
 				m_mode = AVOIDANCE;
 			}
 			break;
 		case AVOIDANCE:
-			m_maxWinSize += MAXPAYLOAD;
+			m_maxWinSize += MAXPAYLOAD / (m_maxWinSize / MAXPAYLOAD);
 			break;
 		case FASTRET:
 			std::cerr << "Not implemented yet" << std::endl;
@@ -134,6 +137,7 @@ bool OutputBuffer::hasSpace(uint16_t size) {
 
 uint16_t OutputBuffer::insert(Packet p) {
 	//main loop must call hasSpace before to avoid congestion
+	// std::cerr << "Printing seqno in insert " << m_seqNo << std::endl;
 	p.setSeqNo(m_seqNo);
 	p.setRcvWin(m_maxWinSize);
 
@@ -223,12 +227,12 @@ void OutputBuffer::toString() {
 	std::cerr << std::endl;
 }
 
-int OutputBuffer::getFinTries() {
-	return m_finTries;
-}
-
 int OutputBuffer::getSynTries() {
 	return m_synTries;
+}
+
+int OutputBuffer::getFinTries() {
+	return m_finTries;
 }
 
 

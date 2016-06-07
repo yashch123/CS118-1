@@ -66,7 +66,7 @@ bool ReceivingBuffer::insert(Packet p) {
         if (toInsert.seq == m_buffer[k].seq) {
             if (toInsert.seq % MAXSEQNO == m_expectedSeqNo)
                 m_expectedSeqNo = (m_expectedSeqNo + toInsert.data.size()) % MAXSEQNO;
-            return false;
+            return true; // CHANGED THIS
         }
     }
 
