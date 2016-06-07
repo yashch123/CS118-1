@@ -268,7 +268,7 @@ int main(int argc, char **argv)
 	rcvbuf.sortBuffer();
 	// rcvbuf.removeDups(); 
 	vector<DataSeqPair> fileBuf = rcvbuf.getBuffer();
-	ofstream outfile("file.txt", std::ios::out | std::ios::binary );
+	ofstream outfile("received.data", std::ios::out | std::ios::binary );
 	ostream_iterator<uint8_t> oi(outfile, "");
 	for (auto i = fileBuf.begin(); i != fileBuf.end(); i++) {
 		copy((*i).data.begin(), (*i).data.end(), oi);

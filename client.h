@@ -9,8 +9,7 @@ struct DataSeqPair
 {
     Data data;
     unsigned int seq;
-    int round; 
-    bool operator==(const DataSeqPair& rhs);
+    unsigned int round; 
 };
 
 bool compareForSort(const struct DataSeqPair& l, const struct DataSeqPair& r) { 
@@ -40,9 +39,6 @@ private:
     std::vector<DataSeqPair> m_buffer;
 };
 
-bool DataSeqPair::operator==(const DataSeqPair& rhs) {
-    return (this->seq == rhs.seq);
-}
 ReceivingBuffer::ReceivingBuffer() { 
     m_round = 0; 
     m_expectedSeqNo = 0;
@@ -55,27 +51,35 @@ void ReceivingBuffer::setSeqNo(uint16_t seqNo) {
 
 // Inserts packet into buffer as DataSeqPair and returns ACK number
 void ReceivingBuffer::insert(Packet p) {
-    bool already_in_buffer = false; 
     // Set up a DataSeqPair
     unsigned int k;
-    int offset; 
     DataSeqPair toInsert;
     toInsert.seq = p.getSeqNo() + (m_round * MAXSEQNO); // MAXSEQNO = 30720
+    
+    if (toInsert.seq > (unsigned) m_expectedSeqNo + m_round * MAXSEQNO)
+        return;
+
     toInsert.data = p.getData();
     toInsert.round = m_round;
 
     for(k = 0; k < m_buffer.size(); k++){
         if (toInsert.seq == m_buffer[k].seq) {
-            already_in_buffer = true; 
-            std::cout << "duplicate" << std::endl;
+            if (toInsert.seq % MAXSEQNO == m_expectedSeqNo)
+                m_expectedSeqNo = (m_expectedSeqNo + toInsert.data.size()) % MAXSEQNO;
+            return;
         }
     }
 
     if (toInsert.data.size() + p.getSeqNo() > MAXSEQNO)
         m_round++;
-    if (!already_in_buffer)
-        m_buffer.push_back(toInsert);
+    m_buffer.push_back(toInsert);
     sortBuffer();
+
+    // std::cerr << "Printing sequence numbers, should be increasing" << std::endl;
+
+    // for (k = 0; k < m_buffer.size(); k++)
+    //     std::cerr << m_buffer[k].seq << std::endl;
+
     // std::cerr << "In Insert" << std::endl;
 
     // Go through receive buffer 
@@ -95,7 +99,7 @@ void ReceivingBuffer::insert(Packet p) {
                 m_last_unsorted_index = k;
 
                 // search for first unacked 
-                for(int j = m_last_unsorted_index; j < m_buffer.size(); j++) {
+                for(unsigned int j = m_last_unsorted_index; j < m_buffer.size(); j++) {
                     if ((m_buffer[j].seq) == (m_expectedSeqNo + (m_buffer[j].round * MAXSEQNO))){
                         m_expectedSeqNo = (m_expectedSeqNo + m_buffer[j].data.size()) % MAXSEQNO;
                         m_last_unsorted_index = j; 
@@ -117,15 +121,6 @@ std::vector<DataSeqPair> ReceivingBuffer::getBuffer() {
 void ReceivingBuffer::sortBuffer() {
     std::sort(m_buffer.begin(), m_buffer.end(), compareForSort);
     // m_buffer.erase((unique(m_buffer.begin(), m_buffer.end() ), m_buffer.end() )); 
-}
-
-void ReceivingBuffer::removeDups() { 
-    for(auto i = m_buffer.begin(); i != (m_buffer.end() - 1); /* nothing here */) { 
-        if (i->seq == (i+1)->seq)
-            i = m_buffer.erase(i); 
-        else 
-            i++; 
-    }
 }
 
 uint16_t ReceivingBuffer::getExpectedSeqNo() { 
