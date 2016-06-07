@@ -41,6 +41,7 @@ public:
 	int getFinTries();
 	void incFinTries();
 	void printFin(bool retransmit);
+	void printAck();
 private:
 	int m_finTries;
 	int m_synTries;
@@ -143,6 +144,8 @@ uint16_t OutputBuffer::insert(Packet p) {
 	p.setSeqNo(m_seqNo);
 	p.setRcvWin(m_maxWinSize);
 
+	std::cout << "Sending packet " << m_seqNo << " " << m_maxWinSize << " " << m_ssthresh;
+
 	int ackNo;
 	if((p.hasSYN() && m_synTries == 0) || (p.hasFIN() && m_finTries == 0)) {
 		ackNo = (m_seqNo + 1) % MAXSEQNO;
@@ -152,7 +155,6 @@ uint16_t OutputBuffer::insert(Packet p) {
 		m_seqNo = (m_seqNo + p.getData().size()) % MAXSEQNO;
 	}
 
-	std::cout << "Sending packet " << m_seqNo << " " << m_maxWinSize << " " << m_ssthresh;
 			//retransmission?
 	if (p.hasSYN()) {
 		std::cout << " " << "SYN";
@@ -243,9 +245,15 @@ void OutputBuffer::incFinTries() {
 
 void OutputBuffer::printFin(bool retransmit) {
     std::cout << "Sending packet " << m_seqNo << " " << m_maxWinSize << " " << m_ssthresh;
-    if (retransmit)
+    if (retransmit) {
     	std::cout << " Retransmission";
+    }
     std::cout << " FIN" << std::endl;
+}
+
+void OutputBuffer::printAck() {
+	m_seqNo = (m_seqNo + 1) % MAXSEQNO;
+	std::cout << "Sending packet " << m_seqNo << " " << m_maxWinSize << " " << m_ssthresh << std::endl;
 }
 
 

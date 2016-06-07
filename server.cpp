@@ -208,6 +208,8 @@ int main(int argc, char **argv) {
                     {
                         perror("sendto(): FILE"); 
                     }
+                    Packet p(oBuffer.getSeg(data_ack_no));
+                    // p.toString();
                 }
 
                 if(!reader.hasMore()) {
@@ -236,19 +238,18 @@ int main(int argc, char **argv) {
                     //cerr << "Entering teardown" << endl; 
                     // send FIN
                     Packet fin_packet;
+                    oBuffer.printFin(false);
                     fin_packet.setFIN();
                     fin_packet.setSeqNo(oBuffer.nextSegSeq());
                     fin_ack_no = fin_packet.getSeqNo() + 1;
+                    //fin_packet.toString();
                     Segment s = fin_packet.encode();
-                    oBuffer.printFin(false);
                     //cerr << "Sending FIN" << endl;
                     if (sendto(sockfd, s.data(), s.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
                         perror("sendto(): FIN"); 
                     }
                 }
-                else {
-                    continue;
-                }
+                continue;
                 //cerr << "Buffer isn't empty, return to select" << endl;
                
             }
@@ -258,6 +259,7 @@ int main(int argc, char **argv) {
                 //cerr << "state CLOSE:" << endl; 
                 // close connection
                 //cerr << current_packet.getAckNo() << endl;
+                current_packet.toString();
                 if(current_packet.hasACK() && current_packet.getAckNo() == fin_ack_no) {
                     oBuffer.ack(fin_ack_no, true);
                     current_state = FINWAIT; 
@@ -267,6 +269,7 @@ int main(int argc, char **argv) {
                     fin_packet.setFIN();
                     fin_packet.setSeqNo(oBuffer.nextSegSeq());
                     Segment s = fin_packet.encode();
+                    //fin_packet.toString();
                     if (sendto(sockfd, s.data(), s.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
                         perror("sendto fin"); 
                     }
@@ -287,11 +290,12 @@ int main(int argc, char **argv) {
                     Packet final_ack_packet; 
                     final_ack_packet.setAckNo(ack_no_to_client + 1);
                     final_ack_packet.setACK();
-                    final_ack_packet.setSeqNo(oBuffer.nextSegSeq());
+                    final_ack_packet.setSeqNo(oBuffer.nextSegSeq()+1);
                     Segment s = final_ack_packet.encode();
                     if (sendto(sockfd, s.data(), s.size(), 0 , (struct sockaddr *) &clientaddr, addrlen) < 0) {
                         perror("sendto(): final ACK"); 
                     }
+                    oBuffer.printAck();
                     ready_to_close = true;
                 }
                 else { 

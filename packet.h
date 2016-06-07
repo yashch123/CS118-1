@@ -202,11 +202,11 @@ void Packet::toString() {
 	if(hasFIN())
 		std::cerr << "F";
 	std::cerr << std::endl;
-	/*std::cerr << "Payload size: " << m_data.size() << std::endl;
+	std::cerr << "Payload size: " << m_data.size() << std::endl;
 	for(Data::iterator i = m_data.begin(); i != m_data.end(); i++) {
 		std::cerr << *i;
 	}
-	std::cerr << std::endl;*/
+	std::cerr << std::endl;
 }
 
 #endif // PACKET_H
