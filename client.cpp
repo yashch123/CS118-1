@@ -1,5 +1,4 @@
 #include <string>
-#include <thread>
 #include <iostream>
 #include <iterator>
 #include <stdio.h> 
@@ -105,7 +104,10 @@ int main(int argc, char **argv)
 	if (sendto(sockfd, syn_encoded.data(), syn_encoded.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
 	   	perror("sendto()"); 
 	}
+	cout << "Sending packet " << syn_packet.getSeqNo()+1 << " SYN" << endl;
+
 	FD_SET(sockfd, &readFds);
+	bool toAck = true;
 
 	/****************Enter finite state machine ***********/ 
 	while(1) {
@@ -132,6 +134,7 @@ int main(int argc, char **argv)
 		}
 	    Segment seg(buf, buf + ret);
 	    Packet current_packet(seg);
+	    cout << "Receiving packet " << current_packet.getSeqNo() << endl;
 		// current_packet.toString();
 		switch(current_state) { 
 			case SYNWAIT:
@@ -153,6 +156,11 @@ int main(int argc, char **argv)
 					if (sendto(sockfd, syn_encoded.data(), syn_encoded.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
 					   	perror("sendto()"); 
 					}
+					cout << "Sending packet " << syn_packet.getAckNo();
+					if (syn_tries > 0) {
+						cout << " Retransmission";
+					}
+					cout << " SYN" << endl;
 					continue;
         		}
 				if(current_packet.hasSYN() && current_packet.hasACK() && current_packet.getAckNo() == rcvbuf.getSeqNo() + 1) {
@@ -180,7 +188,7 @@ int main(int argc, char **argv)
 					ack_to_fin_packet.setAckNo(rcvbuf.getExpectedSeqNo());
 					Segment seg = ack_to_fin_packet.encode();	
 
-					cout << "Sending ACK Packet " << rcvbuf.getExpectedSeqNo() << endl; 		
+					cout << "Sending packet " << rcvbuf.getExpectedSeqNo() << endl; 		
 
 					if (sendto(sockfd, seg.data(), seg.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
 				   	{
@@ -191,7 +199,7 @@ int main(int argc, char **argv)
 				    rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);		
 				}
 				else {
-					rcvbuf.insert(current_packet);
+					toAck = rcvbuf.insert(current_packet);
 					break;
 				}
 			}
@@ -224,11 +232,11 @@ int main(int argc, char **argv)
 				finPacket.setSeqNo(rcvbuf.getSeqNo());
 				finPacket.setRcvWin(CLIENTRCVWINDOW);
 				Segment finSend = finPacket.encode();
-				cout << "Sending FIN Packet";
+				cout << "Sending packet " << finPacket.getSeqNo();
 				if (retransmit) {
 					cout << " Retransmission";
 				}
-				cout << endl;
+				cout << " FIN" << endl;
 				//finPacket.toString();
 				if (sendto(sockfd, finSend.data(), finSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0) {
 		   			perror("sendto(): FIN"); 
@@ -242,26 +250,22 @@ int main(int argc, char **argv)
 		}
 
 		// Client only acks 
-		Packet ack;
-		ack.setSeqNo(rcvbuf.getSeqNo());
-		ack.setACK();
-		ack.setAckNo(rcvbuf.getExpectedSeqNo());
-		ack.setRcvWin(CLIENTRCVWINDOW);
-		Segment toSend = ack.encode();
-		if (current_state == SYNWAIT) {
-			cout << "Sending SYN Packet";
-			if (retransmit) {
-				cout << " Retransmission";
+		if (toAck){
+			Packet ack;
+			ack.setSeqNo(rcvbuf.getSeqNo());
+			ack.setACK();
+			ack.setAckNo(rcvbuf.getExpectedSeqNo());
+			ack.setRcvWin(CLIENTRCVWINDOW);
+			Segment toSend = ack.encode();
+			if (current_state == CONNECTED) {
+				cout << "Sending packet " << rcvbuf.getExpectedSeqNo() << endl;
 			}
-			cout << endl;
+			if (sendto(sockfd, toSend.data(), toSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
+	   		{
+	   			perror("sendto(): ACK"); 
+	    	}
 		}
-		else if (current_state == CONNECTED) {
-			cout << "Sending ACK Packet " << rcvbuf.getExpectedSeqNo() << endl;
-		}
-		if (sendto(sockfd, toSend.data(), toSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
-	   	{
-	   		perror("sendto(): ACK"); 
-	    }
+		
 	}
 
 	// Reassemble data by sorting and piecing back together 

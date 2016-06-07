@@ -22,7 +22,7 @@ public:
     ReceivingBuffer(); 
     void setSeqNo(uint16_t seqNo);
     uint16_t getSeqNo() { return m_seqNo; }
-    void insert(Packet p);
+    bool insert(Packet p);
     std::vector<DataSeqPair> getBuffer();
     void sortBuffer();
     void removeDups(); 
@@ -50,14 +50,14 @@ void ReceivingBuffer::setSeqNo(uint16_t seqNo) {
 }
 
 // Inserts packet into buffer as DataSeqPair and returns ACK number
-void ReceivingBuffer::insert(Packet p) {
+bool ReceivingBuffer::insert(Packet p) {
     // Set up a DataSeqPair
     unsigned int k;
     DataSeqPair toInsert;
     toInsert.seq = p.getSeqNo() + (m_round * MAXSEQNO); // MAXSEQNO = 30720
     
     if (toInsert.seq > (unsigned) m_expectedSeqNo + m_round * MAXSEQNO)
-        return;
+        return true;
 
     toInsert.data = p.getData();
     toInsert.round = m_round;
@@ -66,7 +66,7 @@ void ReceivingBuffer::insert(Packet p) {
         if (toInsert.seq == m_buffer[k].seq) {
             if (toInsert.seq % MAXSEQNO == m_expectedSeqNo)
                 m_expectedSeqNo = (m_expectedSeqNo + toInsert.data.size()) % MAXSEQNO;
-            return;
+            return false;
         }
     }
 
@@ -105,12 +105,12 @@ void ReceivingBuffer::insert(Packet p) {
                         m_last_unsorted_index = j; 
                     }
                     else 
-                        return; 
+                        return true; 
                 }
             }
         }
     }
-
+    return true;
     // std::cerr << "We ran off the end" << std::endl;
 }
 

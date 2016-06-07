@@ -3,13 +3,16 @@
 
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <time.h>	//clock
+//#include <time.h>	//clock
+#include <chrono>
 
 #include <string>
 #include <queue>
 #include <unordered_map>
 
 #include "packet.h"
+
+typedef std::chrono::high_resolution_clock Clock;
 
 enum mode {
     SLOWSTART,
@@ -18,7 +21,7 @@ enum mode {
 };
 
 struct timeDataPair {
-	clock_t time;
+	Clock::time_point time;
 	Segment seg;
 };
 
@@ -34,7 +37,11 @@ public:
 	bool isEmpty();
 	void toString();
 	std::vector<Segment> poll();
+	int getFinTries();
+	int getSynTries();
 private:
+	int m_finTries;
+	int m_synTries;
 	uint16_t m_seqNo;	//sequence number
 	uint16_t m_currentWinSize;	//current number of bytes in the network
 	uint16_t m_maxWinSize;	//maximum number of bytes allowed in the current congestion window
@@ -54,6 +61,8 @@ private:
 };
 
 void OutputBuffer::setInitSeq(uint16_t seqNo) {
+	m_finTries = 0;
+	m_synTries = 0;
 	m_seqNo = seqNo;
 	m_currentWinSize = 0;
 	m_maxWinSize = 1024;
@@ -62,14 +71,14 @@ void OutputBuffer::setInitSeq(uint16_t seqNo) {
 }
 
 void OutputBuffer::ack(uint16_t ackNo) {
-	std::cout << "Receiving ACK packet " << ackNo << std::endl;
+	std::cout << "Receiving packet " << ackNo << std::endl;
 	if(m_map.find(ackNo) == m_map.end()) {
 		return;
 	}
 	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end();) {
 		if(ackNo >= MAXSEQNO/2) {
-			std::cerr << "Range: " << (ackNo - MAXSEQNO/2) << "\t" << ackNo << std::endl;
-			std::cerr << "Testing: " << i->first << std::endl;
+			//std::cerr << "Range: " << (ackNo - MAXSEQNO/2) << "\t" << ackNo << std::endl;
+			//std::cerr << "Testing: " << i->first << std::endl;
 			if(i->first >= (ackNo - MAXSEQNO/2) && i->first <= ackNo) {
 				m_currentWinSize -= (i->second.seg.size() - 8);
 				i = m_map.erase(i);
@@ -79,8 +88,8 @@ void OutputBuffer::ack(uint16_t ackNo) {
 			}
 		}
 		else {
-			std::cerr << "Range: " << 0 << "\t" << ackNo << ",\t" << ackNo + MAXSEQNO/2 << "\t" << MAXSEQNO << std::endl;
-			std::cerr << "Testing: " << i->first << std::endl;
+			//std::cerr << "Range: " << 0 << "\t" << ackNo << ",\t" << ackNo + MAXSEQNO/2 << "\t" << MAXSEQNO << std::endl;
+			//std::cerr << "Testing: " << i->first << std::endl;
 			if(i->first <= ackNo || i->first >= (ackNo + MAXSEQNO/2)) {
 				m_currentWinSize -= (i->second.seg.size() - 8);
 				i = m_map.erase(i);
@@ -114,7 +123,7 @@ void OutputBuffer::ack(uint16_t ackNo) {
 }
 
 void OutputBuffer::timeout() {
-	m_ssthresh = m_maxWinSize/2;
+	m_ssthresh = m_maxWinSize/2 > 1024 ? m_maxWinSize/2 : 1024;
 	m_maxWinSize = 1024;
 	m_mode = SLOWSTART;
 }
@@ -125,27 +134,32 @@ bool OutputBuffer::hasSpace(uint16_t size) {
 
 uint16_t OutputBuffer::insert(Packet p) {
 	//main loop must call hasSpace before to avoid congestion
-	p.setSeqNo(nextSegSeq());
+	p.setSeqNo(m_seqNo);
 	p.setRcvWin(m_maxWinSize);
 
 	int ackNo;
-	if(p.hasSYN() || p.hasFIN()) {
-		ackNo = (nextSegSeq() + 1) % MAXSEQNO;
-		m_seqNo = (m_seqNo + 1) % MAXSEQNO;
+	if((p.hasSYN() && m_synTries == 0) || (p.hasFIN() && m_finTries == 0)) {
+		ackNo = (m_seqNo + 1) % MAXSEQNO;
 	}
 	else {
-		ackNo = (nextSegSeq() + p.getData().size()) % MAXSEQNO;
-		//if p is a normal data packet, print message
-		if(!p.hasACK()) {
-			std::cout << "Sending data packet " << nextSegSeq() << " " << m_maxWinSize << " " << m_ssthresh;
-			//retransmission?
-			std::cout << std::endl;
-		}
+		ackNo = (m_seqNo + p.getData().size()) % MAXSEQNO;
 		m_seqNo = (m_seqNo + p.getData().size()) % MAXSEQNO;
 	}
 
+	std::cout << "Sending packet " << m_seqNo << " " << m_maxWinSize << " " << m_ssthresh;
+			//retransmission?
+	if (p.hasSYN()) {
+		std::cout << " " << "SYN";
+		m_seqNo = (m_seqNo + 1) % MAXSEQNO;
+	}
+	else if (p.hasFIN()) {
+		std::cout << " " << "FIN";
+		m_seqNo = (m_seqNo + 1) % MAXSEQNO;
+	}
+	std::cout << std::endl;
+
 	timeDataPair pair;
-	pair.time = clock();
+	pair.time = Clock::now();
 	pair.seg = p.encode();
 
 	m_map[ackNo] = pair;
@@ -168,19 +182,25 @@ std::vector<Segment> OutputBuffer::poll() {
 	std::vector<Segment> ret;
 	bool anyTimeout = false;
 	for(std::unordered_map<uint16_t, timeDataPair>::iterator i = m_map.begin(); i != m_map.end(); i++) {
-		clock_t begin = i->second.time;
-		double timeWaiting = ((double)(clock() - begin)* 1000000000)/CLOCKS_PER_SEC;
-		std::cerr << "Polling " << i->first << "\t" << timeWaiting << std::endl;
+		Clock::time_point begin = i->second.time;
+		auto timeWaiting = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - begin).count();
+		//std::cerr << "Polling " << i->first << "\t" << timeWaiting << std::endl;
 		//CHANGE THIS BACK TO RTO AFTER DEBUGGING
 		if(timeWaiting > RTO) {
 			anyTimeout = true;
 			ret.push_back(i->second.seg);
-			i->second.time = clock();
+			i->second.time = Clock::now();
 			Packet p(i->second.seg);
-			if(!(p.hasSYN() || p.hasFIN()))
-				std::cout << "Sending data packet " << p.getSeqNo() << " " << m_maxWinSize << " " << m_ssthresh << " Retransmission" << std::endl;
-			else
-				std::cerr << "Resending ACK/FIN " << p.getSeqNo() << std::endl;
+			std::cout << "Sending packet " << p.getSeqNo() << " " << m_maxWinSize << " " << m_ssthresh << " Retransmission";
+			if (p.hasSYN()) {
+				std::cout << " SYN";
+				m_synTries++;
+			}
+			else if (p.hasFIN()) {
+				std::cout << " FIN";
+				m_finTries++;
+			}
+			std::cout << std::endl;
 		}
 	}
 	if(anyTimeout) {
@@ -202,6 +222,15 @@ void OutputBuffer::toString() {
 	}
 	std::cerr << std::endl;
 }
+
+int OutputBuffer::getFinTries() {
+	return m_finTries;
+}
+
+int OutputBuffer::getSynTries() {
+	return m_synTries;
+}
+
 
 FileReader::FileReader(std::string filename) {
 	int fd = open(filename.c_str(), O_RDONLY);
