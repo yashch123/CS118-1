@@ -154,7 +154,7 @@ int main(int argc, char **argv)
         			retransmit = true;
         			syn_tries++;
         			if (syn_tries == 3) {
-        				//cerr << "Client could not connect" << endl;
+        				cerr << "Client could not connect" << endl;
         				exit(4);
         			}
         			Packet syn_packet; 
@@ -223,8 +223,8 @@ int main(int argc, char **argv)
 	        		if (nfds == 0) {
 	        			retransmit = true;
 	        			fin_tries++;
-	        			if (fin_tries > 4) {
-	       					cerr << "Client could not transmit FIN, now closing" << endl;
+	        			if (fin_tries >= 3) {
+	       					//cerr << "Client could not transmit FIN, now closing" << endl;
 	       					connection_done = true; 
 	       					continue;
 	       				}

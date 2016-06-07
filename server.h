@@ -39,6 +39,8 @@ public:
 	std::vector<Segment> poll();
 	int getSynTries();
 	int getFinTries();
+	void incFinTries();
+	void printFin(bool retransmit);
 private:
 	int m_finTries;
 	int m_synTries;
@@ -234,6 +236,18 @@ int OutputBuffer::getSynTries() {
 int OutputBuffer::getFinTries() {
 	return m_finTries;
 }
+
+void OutputBuffer::incFinTries() {
+	m_finTries++;
+}
+
+void OutputBuffer::printFin(bool retransmit) {
+    std::cout << "Sending packet " << m_seqNo << " " << m_maxWinSize << " " << m_ssthresh;
+    if (retransmit)
+    	std::cout << " Retransmission";
+    std::cout << " FIN" << std::endl;
+}
+
 
 
 FileReader::FileReader(std::string filename) {
