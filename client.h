@@ -3,6 +3,7 @@
 
 #include <algorithm> 
 #include <map>
+#include <fstream>      // ofstream
 
 #include "packet.h"
 
@@ -17,6 +18,7 @@ public:
     uint16_t getExpectedSeqNo(); 
     void setExpectedSeqNo(uint16_t expectedSeqNo);
     void printCumulative(uint16_t seqNo);
+    std::vector<Data> clearBuffer();
 private:
     // Initial sequence number
     uint16_t m_seqNo;
@@ -87,4 +89,19 @@ void ReceivingBuffer::setExpectedSeqNo(uint16_t expectedSeqNo) {
 void ReceivingBuffer::printCumulative(uint16_t seqNo) {
     std::cerr << seqNo + m_round * MAXSEQNO << std::endl;
 }
+
+std::vector<Data> ReceivingBuffer::clearBuffer() {
+    std::vector ret; 
+    for(auto k = m_buffer.begin(); k != (m_buffer.end() - 1); k++) { 
+        if (k->first + MAXPAYLOAD == (k+1)->first)
+            ret.push_back(k->second); 
+        else {
+            m_buffer.erase(m_buffer.begin(), k); 
+            return ret; 
+        }
+    }
+    return ret; 
+}
+
+
 #endif

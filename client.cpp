@@ -10,7 +10,6 @@
 #include <netdb.h> 		// gethostbyname
 #include <stdlib.h> 	// atoi, rand
 #include <ctype.h>		// isalpha
-#include <fstream>		// ofstream
 #include <time.h>
 
 #include "client.h"
@@ -106,6 +105,7 @@ int main(int argc, char **argv)
 	   	exit(1);
 	}
 	cout << "Sending packet " << "SYN" << endl;
+	ofstream outfile("received.data", std::ios::out | std::ios::binary );
 
 	FD_SET(sockfd, &readFds);
 
@@ -213,6 +213,13 @@ int main(int argc, char **argv)
 				else {
 					//cerr << "Inserting" << endl;
 					rcvbuf.insert(current_packet);
+					vector<Data> vec = rcvbuf.clearBuffer(); 
+					if(!vec.empty()) {
+						ostream_iterator<uint8_t> oi(outfile, "");
+						for (auto i = fileBuf.begin(); i != fileBuf.end(); i++) {
+							copy(i->second.begin(), i->second.end(), oi);
+						}
+					}
 					break;
 				}
 			}
@@ -284,7 +291,6 @@ int main(int argc, char **argv)
 
 	// rcvbuf.removeDups(); 
 	map<unsigned int, Data> fileBuf = rcvbuf.getBuffer();
-	ofstream outfile("received.data", std::ios::out | std::ios::binary );
 	ostream_iterator<uint8_t> oi(outfile, "");
 	for (auto i = fileBuf.begin(); i != fileBuf.end(); i++) {
 		copy(i->second.begin(), i->second.end(), oi);
