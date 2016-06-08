@@ -3,6 +3,7 @@
 
 #include <algorithm> 
 #include <map>
+#include <cmath>
 
 #include "packet.h"
 
@@ -40,7 +41,42 @@ void ReceivingBuffer::setSeqNo(uint16_t seqNo) {
 
 //  inserts data chunk into buffer and adjusts m_expectedSeqNo if corresponding data found
 void ReceivingBuffer::insert(Packet p) {
-    int roundToUse = m_round;
+    if(p.getSeqNo() < m_expectedSeqNo) {
+        return;
+    }
+    unsigned int key;
+    int diff = std::abs(p.getSeqNo() - m_expectedSeqNo);
+    if(diff <= MAXSEQNO/2) {
+        key = p.getSeqNo() + (m_round * MAXSEQNO); // MAXSEQNO = 30720;
+    }
+    else {
+        if(m_expectedSeqNo >= MAXSEQNO/2) {
+            key = p.getSeqNo() + ((m_round + 1) * MAXSEQNO);
+        }
+        else {
+            key = p.getSeqNo() + ((m_round - 1) * MAXSEQNO);
+        }
+    }
+    std::cerr << "The key is " << key << std::endl; 
+    if(m_buffer.find(key) != m_buffer.end()) {
+        //std::cerr << "Packet ignored: seqNo " << key << std::endl;
+        return; //do not overwrite existing entries
+    }
+    Data data = p.getData();
+    m_buffer[key] = data;
+
+    unsigned int expectedCumulative = m_expectedSeqNo + (m_round * MAXSEQNO);
+    while(m_buffer.find(expectedCumulative) != m_buffer.end()) {
+        // std::cerr << "Increasing m_expectedSeqNo from " << expectedCumulative << "(" << expectedCumulative % MAXSEQNO << ")";
+        if(m_buffer[expectedCumulative].size() + m_expectedSeqNo > MAXSEQNO) {
+            m_round++;
+        }
+        expectedCumulative = expectedCumulative + m_buffer[expectedCumulative].size();
+        m_expectedSeqNo = expectedCumulative % MAXSEQNO;
+        // std::cerr << " to " << expectedCumulative << "(" << expectedCumulative % MAXSEQNO << ")" << std::endl;
+    }
+
+    /*int roundToUse = m_round;
     unsigned int B = p.getSeqNo() + m_round * MAXSEQNO;
     unsigned int A = m_expectedSeqNo + m_round * MAXSEQNO;
     if (m_round == 0 && (abs(A - B) > MAXWINDOW))
@@ -68,7 +104,7 @@ void ReceivingBuffer::insert(Packet p) {
     }
     if(increaseRound) {
         m_round++;
-    }
+    }*/
 }
 
 std::map<unsigned int, Data> ReceivingBuffer::getBuffer() {
