@@ -57,7 +57,7 @@ void ReceivingBuffer::insert(Packet p) {
             key = p.getSeqNo() + ((m_round - 1) * MAXSEQNO);
         }
     }
-    std::cerr << "The key is " << key << std::endl; 
+    //std::cerr << "The key is " << key << std::endl; 
     if(m_buffer.find(key) != m_buffer.end()) {
         //std::cerr << "Packet ignored: seqNo " << key << std::endl;
         return; //do not overwrite existing entries

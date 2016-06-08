@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
     struct timeval tv;
 
     while(1) {
-        if (ready_to_close || oBuffer.getFinTries() >= 3 || oBuffer.getSynTries() >= 3)
+        if (ready_to_close /* || oBuffer.getFinTries() >= 3  || oBuffer.getSynTries() >= 3 */)
             break; 
         /*clock_t delay = clock();
         while((clock() - delay) * 1000000000/CLOCKS_PER_SEC < 3000000000) {
@@ -259,7 +259,7 @@ int main(int argc, char **argv) {
                 //cerr << "state CLOSE:" << endl; 
                 // close connection
                 //cerr << current_packet.getAckNo() << endl;
-                current_packet.toString();
+                //current_packet.toString();
                 if(current_packet.hasACK() && current_packet.getAckNo() == fin_ack_no) {
                     oBuffer.ack(fin_ack_no, true);
                     current_state = FINWAIT; 

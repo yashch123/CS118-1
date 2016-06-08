@@ -152,11 +152,13 @@ int main(int argc, char **argv)
 				// if not correct, send again
         		if (nfds == 0) {
         			retransmit = true;
+        			/*
         			syn_tries++;
         			if (syn_tries == 3) {
         				cerr << "Client could not connect" << endl;
         				exit(4);
         			}
+        			*/
         			Packet syn_packet; 
 					syn_packet.setSYN(); 
 					syn_packet.setSeqNo(rcvbuf.getSeqNo());
