@@ -108,7 +108,6 @@ int main(int argc, char **argv)
 	cout << "Sending packet " << "SYN" << endl;
 
 	FD_SET(sockfd, &readFds);
-	bool toAck = true;
 
 	/****************Enter finite state machine ***********/ 
 	while(1) {
@@ -142,6 +141,7 @@ int main(int argc, char **argv)
 			seg = Segment(buf, buf + ret);
 	    	current_packet = Packet(seg);
 	    	cout << "Receiving packet " << current_packet.getSeqNo() << endl;
+	    	// rcvbuf.printCumulative(current_packet.getSeqNo());
 		}
 	    
 		// current_packet.toString();
@@ -185,6 +185,7 @@ int main(int argc, char **argv)
 	    	}
 			case CONNECTED:
 			{
+				//cerr << "Connected state" << endl;
 				// CHECK CASE WHERE ACK GETS LOST?????????
 				if (current_packet.hasFIN()) {
 					// move onto CLOSE state
@@ -210,7 +211,8 @@ int main(int argc, char **argv)
 				    rcvbuf.setSeqNo((rcvbuf.getSeqNo() + 1) % MAXSEQNO);		
 				}
 				else {
-					toAck = rcvbuf.insert(current_packet);
+					//cerr << "Inserting" << endl;
+					rcvbuf.insert(current_packet);
 					break;
 				}
 			}
@@ -262,33 +264,30 @@ int main(int argc, char **argv)
 		}
 
 		// Client only acks 
-		if (toAck){
-			Packet ack;
-			ack.setSeqNo(rcvbuf.getSeqNo());
-			ack.setACK();
-			ack.setAckNo(rcvbuf.getExpectedSeqNo());
-			ack.setRcvWin(CLIENTRCVWINDOW);
-			Segment toSend = ack.encode();
-			if (current_state == CONNECTED) {
-				cout << "Sending packet " << rcvbuf.getExpectedSeqNo() << endl;
-			}
-			if (sendto(sockfd, toSend.data(), toSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
-	   		{
-	   			perror("sendto(): ACK"); 
-	   			exit(8);
-	    	}
+		Packet ack;
+		ack.setSeqNo(rcvbuf.getSeqNo());
+		ack.setACK();
+		ack.setAckNo(rcvbuf.getExpectedSeqNo());
+		ack.setRcvWin(CLIENTRCVWINDOW);
+		Segment toSend = ack.encode();
+		if (current_state == CONNECTED) {
+			cout << "Sending packet " << rcvbuf.getExpectedSeqNo() << endl;
 		}
+		if (sendto(sockfd, toSend.data(), toSend.size(), 0 , (struct sockaddr *) &servaddr, addrlen) < 0)
+   		{
+   			perror("sendto(): ACK"); 
+   			exit(8);
+    	}
+		
 		
 	}
 
-	// Reassemble data by sorting and piecing back together 
-	rcvbuf.sortBuffer();
 	// rcvbuf.removeDups(); 
-	vector<DataSeqPair> fileBuf = rcvbuf.getBuffer();
+	map<unsigned int, Data> fileBuf = rcvbuf.getBuffer();
 	ofstream outfile("received.data", std::ios::out | std::ios::binary );
 	ostream_iterator<uint8_t> oi(outfile, "");
 	for (auto i = fileBuf.begin(); i != fileBuf.end(); i++) {
-		copy((*i).data.begin(), (*i).data.end(), oi);
+		copy(i->second.begin(), i->second.end(), oi);
 	}
 
     close(sockfd);

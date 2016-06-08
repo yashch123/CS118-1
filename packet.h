@@ -70,10 +70,10 @@ Packet::Packet() {
 }
 
 Packet::Packet(Segment encoded) {
-	setSeqNo((encoded[0] << 8) 	| encoded[1]);
-	setAckNo((encoded[2] << 8) 	| encoded[3]);
-	setRcvWin((encoded[4] << 8) | encoded[5]);
-	setFlags((encoded[6] << 8) 	| encoded[7]);
+	setSeqNo(ntohs((encoded[0] << 8) 	| encoded[1]));
+	setAckNo(ntohs((encoded[2] << 8) 	| encoded[3]));
+	setRcvWin(ntohs((encoded[4] << 8) | encoded[5]));
+	setFlags(ntohs((encoded[6] << 8) 	| encoded[7]));
 	// m_data.clear();
 	if (encoded.size() > 8) {
 		m_data.clear();
@@ -159,31 +159,27 @@ Data Packet::getData() {
 
 Segment Packet::encode() {
 	Segment v;
-	uint8_t firstHalf, secondHalf;
+	uint16_t net_order_seq_no, net_order_ack_no, net_order_rcv_win, net_order_flags; 
+	net_order_seq_no = htons(m_header.seqNo);
+	net_order_ack_no = htons(m_header.ackNo); 
+	net_order_rcv_win = htons(m_header.rcvWin); 
+	net_order_flags = htons(m_header.flags); 
 
 	// Sequence Number
-	firstHalf = m_header.seqNo >> 8;
-	secondHalf = m_header.seqNo;
-	v.push_back(firstHalf);
-	v.push_back(secondHalf);
+	v.push_back(net_order_seq_no >> 8);
+	v.push_back(net_order_seq_no);
 
 	// Ack Number
-	firstHalf = m_header.ackNo >> 8;
-	secondHalf = m_header.ackNo;
-	v.push_back(firstHalf);
-	v.push_back(secondHalf);
+	v.push_back(net_order_ack_no >> 8);
+	v.push_back(net_order_ack_no);
 
 	// Receive Window
-	firstHalf = m_header.rcvWin >> 8;
-	secondHalf = m_header.rcvWin;
-	v.push_back(firstHalf);
-	v.push_back(secondHalf);
+	v.push_back(net_order_rcv_win >> 8);
+	v.push_back(net_order_rcv_win);
 
 	// Flags
-	firstHalf = m_header.flags >> 8;
-	secondHalf = m_header.flags;
-	v.push_back(firstHalf);
-	v.push_back(secondHalf);
+	v.push_back(net_order_flags >> 8);
+	v.push_back(net_order_flags);
 
 	// Data
 	v.insert(v.end(), m_data.begin(), m_data.end());
